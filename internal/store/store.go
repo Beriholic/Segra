@@ -22,9 +22,11 @@ type Settings struct {
 	MaxConcurrent int    `json:"maxConcurrent"`
 	APIPort       int    `json:"apiPort"`
 	APIToken      string `json:"apiToken"`
+	EnableAPI     bool   `json:"enableAPI"`
 	Language      string `json:"language"` // "" follows the system
 	Notifications bool   `json:"notifications"`
 	AutoResume    bool   `json:"autoResume"`
+	ClipboardFill bool   `json:"clipboardFill"`
 	OpenAtLogin   bool   `json:"openAtLogin"`
 	CloseToTray   bool   `json:"closeToTray"`
 }
@@ -37,9 +39,11 @@ func DefaultSettings(downloadDir string) Settings {
 		Connections:   32,
 		MaxConcurrent: 3,
 		APIPort:       47823,
+		EnableAPI:     false,
 		Language:      "",
 		Notifications: true,
 		AutoResume:    true,
+		ClipboardFill: false,
 		OpenAtLogin:   false,
 		CloseToTray:   false,
 	}

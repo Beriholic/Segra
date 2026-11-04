@@ -28,6 +28,12 @@ func TestLoadSettingsMigratesOldConnections(t *testing.T) {
 	}
 }
 
+func TestDefaultSettingsClipboardFillIsOptIn(t *testing.T) {
+	if DefaultSettings("/tmp").ClipboardFill {
+		t.Fatal("clipboard fill must be off on a first run")
+	}
+}
+
 func TestLoadSettingsKeepsCustomConnections(t *testing.T) {
 	dir := t.TempDir()
 	old := `{"downloadDir":"/tmp","connections":4,"maxConcurrent":3,"apiPort":47823}`

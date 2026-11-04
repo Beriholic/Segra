@@ -20,8 +20,6 @@ Segra 是一个原生多线程分段下载器：Go + [egoist/mygo](https://githu
 - **本地 API**：只监听 `127.0.0.1`，方便脚本或其他客户端接入。
 - **系统代理**：通过 `mygo/netproxy` 跟随系统代理设置。
 
-![设置](docs/settings.png)
-
 ## 环境要求
 
 - macOS 12+ / Windows 10+ / Linux（GTK）
@@ -38,6 +36,8 @@ go tool mygo dev        # 热重载开发
 go test ./...           # 单元测试（含 Range / 续传 / 单流回退）
 go tool mygo vet .      # 原生 UI 生命周期检查
 ```
+
+代码怎么分文件、依赖往哪个方向走，见 [docs/architecture.md](docs/architecture.md)。
 
 ## 打包
 

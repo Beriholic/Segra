@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"net/http"
@@ -11,11 +11,11 @@ import (
 	"github.com/beriholic/segra/locales"
 )
 
-func newTestApp(t *testing.T) *app {
+func newTestApp(t *testing.T) *App {
 	t.Helper()
 	dir := t.TempDir()
 
-	a := &app{view: "all", selected: -1, downloadsOpen: true, settingsOpen: true}
+	a := &App{view: "all", selected: -1, downloadsOpen: true, settingsOpen: true}
 	st, err := store.Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -92,5 +92,25 @@ func TestEmptyState(t *testing.T) {
 	tt := ui.NewTester(a.viewFn, 920, 660)
 	if !tt.HasText(locales.NoTasks()) {
 		t.Fatalf("texts %q do not show the empty state", tt.Texts())
+	}
+}
+
+func TestClipboardLink(t *testing.T) {
+	cases := map[string]string{
+		"https://example.com/file.zip":  "https://example.com/file.zip",
+		"  https://example.com/a?b=1  ": "https://example.com/a?b=1",
+		"http://example.com/file.zip":   "http://example.com/file.zip",
+		"not a link":                    "",
+		"hello":                         "",
+		"ftp://example.com/file.zip":    "",
+		"https://":                      "",
+		"example.com/file.zip":          "",
+		"https://example.com/a b":       "",
+		"https://example.com/a\nsecond": "",
+	}
+	for in, want := range cases {
+		if got := clipboardLink(in); got != want {
+			t.Errorf("clipboardLink(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

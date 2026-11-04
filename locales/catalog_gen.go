@@ -504,6 +504,36 @@ func (msgs Messages) PortHint() string {
 	return Catalog.Format(msgs.locale, "portHint", nil)
 }
 
+// EnableAPI says "Enable the extension API"
+// in the language the app shows.
+func EnableAPI() string { return In(i18n.Locale()).EnableAPI() }
+
+// EnableAPI says "Enable the extension API"
+// in the language of msgs.
+func (msgs Messages) EnableAPI() string {
+	return Catalog.Format(msgs.locale, "enableAPI", nil)
+}
+
+// EnableAPIHint says "The browser extension submits downloads through the local API."
+// in the language the app shows.
+func EnableAPIHint() string { return In(i18n.Locale()).EnableAPIHint() }
+
+// EnableAPIHint says "The browser extension submits downloads through the local API."
+// in the language of msgs.
+func (msgs Messages) EnableAPIHint() string {
+	return Catalog.Format(msgs.locale, "enableAPIHint", nil)
+}
+
+// ApiOff says "Off"
+// in the language the app shows.
+func ApiOff() string { return In(i18n.Locale()).ApiOff() }
+
+// ApiOff says "Off"
+// in the language of msgs.
+func (msgs Messages) ApiOff() string {
+	return Catalog.Format(msgs.locale, "apiOff", nil)
+}
+
 // Language says "Language"
 // in the language the app shows.
 func Language() string { return In(i18n.Locale()).Language() }
@@ -562,6 +592,26 @@ func AutoResumeHint() string { return In(i18n.Locale()).AutoResumeHint() }
 // in the language of msgs.
 func (msgs Messages) AutoResumeHint() string {
 	return Catalog.Format(msgs.locale, "autoResumeHint", nil)
+}
+
+// ClipboardFill says "Prefill the link from the clipboard"
+// in the language the app shows.
+func ClipboardFill() string { return In(i18n.Locale()).ClipboardFill() }
+
+// ClipboardFill says "Prefill the link from the clipboard"
+// in the language of msgs.
+func (msgs Messages) ClipboardFill() string {
+	return Catalog.Format(msgs.locale, "clipboardFill", nil)
+}
+
+// ClipboardFillHint says "Read the link on the clipboard when New Download opens."
+// in the language the app shows.
+func ClipboardFillHint() string { return In(i18n.Locale()).ClipboardFillHint() }
+
+// ClipboardFillHint says "Read the link on the clipboard when New Download opens."
+// in the language of msgs.
+func (msgs Messages) ClipboardFillHint() string {
+	return Catalog.Format(msgs.locale, "clipboardFillHint", nil)
 }
 
 // OpenAtLogin says "Open at login"
@@ -992,4 +1042,124 @@ func General() string { return In(i18n.Locale()).General() }
 // in the language of msgs.
 func (msgs Messages) General() string {
 	return Catalog.Format(msgs.locale, "General", nil)
+}
+
+// TaskDetails says "Task details"
+// in the language the app shows.
+func TaskDetails() string { return In(i18n.Locale()).TaskDetails() }
+
+// TaskDetails says "Task details"
+// in the language of msgs.
+func (msgs Messages) TaskDetails() string {
+	return Catalog.Format(msgs.locale, "taskDetails", nil)
+}
+
+// CollapseDetails says "Collapse details"
+// in the language the app shows.
+func CollapseDetails() string { return In(i18n.Locale()).CollapseDetails() }
+
+// CollapseDetails says "Collapse details"
+// in the language of msgs.
+func (msgs Messages) CollapseDetails() string {
+	return Catalog.Format(msgs.locale, "collapseDetails", nil)
+}
+
+// ExpandDetails says "Expand details"
+// in the language the app shows.
+func ExpandDetails() string { return In(i18n.Locale()).ExpandDetails() }
+
+// ExpandDetails says "Expand details"
+// in the language of msgs.
+func (msgs Messages) ExpandDetails() string {
+	return Catalog.Format(msgs.locale, "expandDetails", nil)
+}
+
+// SpeedLastMinute says "Speed · last 60 seconds"
+// in the language the app shows.
+func SpeedLastMinute() string { return In(i18n.Locale()).SpeedLastMinute() }
+
+// SpeedLastMinute says "Speed · last 60 seconds"
+// in the language of msgs.
+func (msgs Messages) SpeedLastMinute() string {
+	return Catalog.Format(msgs.locale, "speedLastMinute", nil)
+}
+
+// ConnectionHealth says "Connection health"
+// in the language the app shows.
+func ConnectionHealth() string { return In(i18n.Locale()).ConnectionHealth() }
+
+// ConnectionHealth says "Connection health"
+// in the language of msgs.
+func (msgs Messages) ConnectionHealth() string {
+	return Catalog.Format(msgs.locale, "connectionHealth", nil)
+}
+
+// Source says "Source"
+// in the language the app shows.
+func Source() string { return In(i18n.Locale()).Source() }
+
+// Source says "Source"
+// in the language of msgs.
+func (msgs Messages) Source() string {
+	return Catalog.Format(msgs.locale, "source", nil)
+}
+
+// Checksum says "Checksum"
+// in the language the app shows.
+func Checksum() string { return In(i18n.Locale()).Checksum() }
+
+// Checksum says "Checksum"
+// in the language of msgs.
+func (msgs Messages) Checksum() string {
+	return Catalog.Format(msgs.locale, "checksum", nil)
+}
+
+// Shards says "Shards"
+// in the language the app shows.
+func Shards() string { return In(i18n.Locale()).Shards() }
+
+// Shards says "Shards"
+// in the language of msgs.
+func (msgs Messages) Shards() string {
+	return Catalog.Format(msgs.locale, "shards", nil)
+}
+
+// Events says "Events"
+// in the language the app shows.
+func Events() string { return In(i18n.Locale()).Events() }
+
+// Events says "Events"
+// in the language of msgs.
+func (msgs Messages) Events() string {
+	return Catalog.Format(msgs.locale, "events", nil)
+}
+
+// Status says "Status"
+// in the language the app shows.
+func Status() string { return In(i18n.Locale()).Status() }
+
+// Status says "Status"
+// in the language of msgs.
+func (msgs Messages) Status() string {
+	return Catalog.Format(msgs.locale, "status", nil)
+}
+
+// Type says "Type"
+// in the language the app shows.
+func Type() string { return In(i18n.Locale()).Type() }
+
+// Type says "Type"
+// in the language of msgs.
+func (msgs Messages) Type() string {
+	return Catalog.Format(msgs.locale, "type", nil)
+}
+
+// Behavior says "Behavior"
+// in the language the app shows.
+func Behavior() string { return In(i18n.Locale()).Behavior() }
+
+// Behavior says "Behavior"
+// in the language of msgs.
+func (msgs Messages) Behavior() string {
+	return Catalog.Format(msgs.locale, "behavior", nil)
 }
