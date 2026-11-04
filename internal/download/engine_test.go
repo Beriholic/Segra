@@ -1,0 +1,490 @@
+package download
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+func waitStatus(t *testing.T, m *Manager, id string, want Status, timeout time.Duration) Task {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if task, ok := m.Get(id); ok && task.Status == want {
+			return task
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	task, _ := m.Get(id)
+	t.Fatalf("task status = %q, want %q (error %q, downloaded %d/%d)", task.Status, want, task.Error, task.Downloaded, task.Size)
+	return task
+}
+
+func testServer(payload []byte, delay time.Duration, ranges bool) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"test-v1"`)
+		w.Header().Set("Content-Type", "application/octet-stream")
+		if ranges {
+			w.Header().Set("Accept-Ranges", "bytes")
+		}
+		rangeHeader := r.Header.Get("Range")
+		if !ranges || rangeHeader == "" {
+			w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+			_, _ = w.Write(payload)
+			return
+		}
+		var start, end int
+		if _, err := fmt.Sscanf(rangeHeader, "bytes=%d-%d", &start, &end); err != nil {
+			http.Error(w, "bad range", http.StatusBadRequest)
+			return
+		}
+		end = min(end, len(payload)-1)
+		if start > end {
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", len(payload)))
+			w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(payload)))
+		w.WriteHeader(http.StatusPartialContent)
+		chunk := payload[start : end+1]
+		flusher, _ := w.(http.Flusher)
+		for len(chunk) > 0 {
+			n := min(4096, len(chunk))
+			if _, err := w.Write(chunk[:n]); err != nil {
+				return
+			}
+			chunk = chunk[n:]
+			if flusher != nil {
+				flusher.Flush()
+			}
+			if delay > 0 {
+				time.Sleep(delay)
+			}
+		}
+	}))
+}
+
+func testManager(t *testing.T, dir string) (*Manager, chan Event) {
+	t.Helper()
+	events := make(chan Event, 16)
+	m := New(&http.Client{Timeout: 0}, Config{Dir: dir, Connections: 4, MaxConcurrent: 2}, nil)
+	m.SetOnEvent(func(e Event) {
+		select {
+		case events <- e:
+		default:
+		}
+	})
+	t.Cleanup(m.Close)
+	return m, events
+}
+
+func TestWorkerPoolBalancesChunks(t *testing.T) {
+	// 16 MB triggers extra chunking: 8 chunks of 2 MB for 4 connections.
+	payload := bytes.Repeat([]byte("0123456789abcdef"), 1<<20)
+	var requests, violations int32
+	sem := make(chan struct{}, 4)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case sem <- struct{}{}:
+			defer func() { <-sem }()
+		default:
+			atomic.AddInt32(&violations, 1)
+		}
+		atomic.AddInt32(&requests, 1)
+		w.Header().Set("ETag", `"test-v1"`)
+		w.Header().Set("Accept-Ranges", "bytes")
+		var start, end int
+		if _, err := fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-%d", &start, &end); err != nil {
+			http.Error(w, "bad range", http.StatusBadRequest)
+			return
+		}
+		end = min(end, len(payload)-1)
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(payload)))
+		w.WriteHeader(http.StatusPartialContent)
+		chunk := payload[start : end+1]
+		for len(chunk) > 0 {
+			n := min(64<<10, len(chunk))
+			if _, err := w.Write(chunk[:n]); err != nil {
+				return
+			}
+			chunk = chunk[n:]
+			if len(chunk) > 0 {
+				time.Sleep(3 * time.Millisecond)
+			}
+		}
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	m, _ := testManager(t, dir)
+
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/big.bin", Connections: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitStatus(t, m, task.ID, StatusCompleted, 60*time.Second)
+	if done.Downloaded != int64(len(payload)) {
+		t.Fatalf("downloaded %d, want %d", done.Downloaded, len(payload))
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "big.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatal("downloaded bytes differ from payload")
+	}
+	if got := atomic.LoadInt32(&violations); got != 0 {
+		t.Fatalf("saw %d requests beyond the 4 workers", got)
+	}
+	if got := atomic.LoadInt32(&requests); got < 8 {
+		t.Fatalf("requests = %d, want at least 8 chunks", got)
+	}
+}
+
+func TestSegmentedDownload(t *testing.T) {
+	payload := bytes.Repeat([]byte("segra-"), 200_000) // 1.2 MB
+	srv := testServer(payload, 0, true)
+	defer srv.Close()
+	dir := t.TempDir()
+	m, events := testManager(t, dir)
+
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/file.bin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitStatus(t, m, task.ID, StatusCompleted, 20*time.Second)
+	if done.Size != int64(len(payload)) || done.Downloaded != int64(len(payload)) {
+		t.Fatalf("size = %d/%d, want %d", done.Downloaded, done.Size, len(payload))
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "file.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("downloaded %d bytes that differ from the payload", len(got))
+	}
+	if _, err := os.Stat(filepath.Join(dir, "file.bin.part")); !os.IsNotExist(err) {
+		t.Fatalf(".part file still exists: %v", err)
+	}
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case e := <-events:
+			if e.Kind == EventCompleted {
+				return
+			}
+			if e.Kind == EventFailed {
+				t.Fatalf("task failed: %s", e.Task.Error)
+			}
+		case <-deadline:
+			t.Fatal("no completion event")
+		}
+	}
+}
+
+func TestPauseAndResume(t *testing.T) {
+	payload := bytes.Repeat([]byte("p"), 512*1024)
+	srv := testServer(payload, 5*time.Millisecond, true)
+	defer srv.Close()
+	dir := t.TempDir()
+	m, _ := testManager(t, dir)
+
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/big.bin", Connections: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		cur, _ := m.Get(task.ID)
+		if cur.Downloaded > 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	m.Pause(task.ID)
+	paused := waitStatus(t, m, task.ID, StatusPaused, 5*time.Second)
+	if paused.Downloaded <= 0 {
+		t.Fatalf("paused task has no progress: %d", paused.Downloaded)
+	}
+	part := filepath.Join(dir, "big.bin.part")
+	if _, err := os.Stat(part); err != nil {
+		t.Fatalf("partial file missing: %v", err)
+	}
+	if _, err := os.Stat(MetadataPath(part)); err != nil {
+		t.Fatalf("metadata missing: %v", err)
+	}
+
+	m.Resume(task.ID)
+	waitStatus(t, m, task.ID, StatusCompleted, 20*time.Second)
+	got, err := os.ReadFile(filepath.Join(dir, "big.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("resumed file has %d bytes, want %d", len(got), len(payload))
+	}
+}
+
+func TestServerWithoutRanges(t *testing.T) {
+	payload := []byte(strings.Repeat("x", 200_000))
+	srv := testServer(payload, 0, false)
+	defer srv.Close()
+	dir := t.TempDir()
+	m, _ := testManager(t, dir)
+
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/plain.bin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitStatus(t, m, task.ID, StatusCompleted, 10*time.Second)
+	got, err := os.ReadFile(filepath.Join(dir, "plain.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatal("single-stream bytes differ")
+	}
+}
+
+func TestFilenameFromDisposition(t *testing.T) {
+	payload := []byte("hello")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Disposition", `attachment; filename="report 2026.pdf"`)
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		_, _ = w.Write(payload)
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	m, _ := testManager(t, dir)
+
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/download?id=7"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitStatus(t, m, task.ID, StatusCompleted, 10*time.Second)
+	if done.FileName != "report 2026.pdf" {
+		t.Fatalf("filename = %q", done.FileName)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "report 2026.pdf")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUniqueNames(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.zip"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := UniqueName(dir, "a.zip"); got != "a (2).zip" {
+		t.Fatalf("UniqueName = %q", got)
+	}
+	if got := Sanitize("../etc/passwd"); strings.ContainsAny(got, "/\\") {
+		t.Fatalf("Sanitize left separators: %q", got)
+	}
+}
+
+func TestRejectsBadURL(t *testing.T) {
+	m, _ := testManager(t, t.TempDir())
+	for _, raw := range []string{"", "ftp://example.com/a", "not a url"} {
+		if _, err := m.Create(CreateRequest{URL: raw}); err == nil {
+			t.Fatalf("Create(%q) succeeded", raw)
+		}
+	}
+}
+
+func TestProgressIsReported(t *testing.T) {
+	payload := bytes.Repeat([]byte("z"), 1024*1024)
+	srv := testServer(payload, 5*time.Millisecond, true)
+	defer srv.Close()
+	m, _ := testManager(t, t.TempDir())
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/p.bin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sawProgress := false
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		cur, _ := m.Get(task.ID)
+		if cur.Downloaded > 0 && cur.Status == StatusDownloading {
+			sawProgress = true
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !sawProgress {
+		t.Fatal("no progress while downloading")
+	}
+	waitStatus(t, m, task.ID, StatusCompleted, 10*time.Second)
+	if io.EOF == nil {
+		t.Fatal("unreachable")
+	}
+}
+
+func TestExistingFileGetsUniqueName(t *testing.T) {
+	payload := bytes.Repeat([]byte("x"), 4096)
+	srv := testServer(payload, 0, true)
+	defer srv.Close()
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "report.bin")
+	if err := os.WriteFile(existing, []byte("keep me"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, _ := testManager(t, dir)
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/report.bin", FileName: "report.bin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitStatus(t, m, task.ID, StatusCompleted, 10*time.Second)
+	if done.FileName != "report (2).bin" {
+		t.Fatalf("fileName = %q, want report (2).bin", done.FileName)
+	}
+	if got, _ := os.ReadFile(existing); string(got) != "keep me" {
+		t.Fatalf("existing file changed: %q", got)
+	}
+}
+
+func TestDoesNotResumeAnotherTasksPart(t *testing.T) {
+	payload := bytes.Repeat([]byte("y"), 256*1024)
+	srv := testServer(payload, 10*time.Millisecond, true)
+	defer srv.Close()
+	dir := t.TempDir()
+	m, _ := testManager(t, dir)
+
+	first, err := m.Create(CreateRequest{URL: srv.URL + "/same.bin", Connections: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitStatus(t, m, first.ID, StatusDownloading, 5*time.Second)
+	m.Pause(first.ID)
+	waitStatus(t, m, first.ID, StatusPaused, 5*time.Second)
+
+	second, err := m.Create(CreateRequest{URL: srv.URL + "/same.bin", Connections: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitStatus(t, m, second.ID, StatusCompleted, 10*time.Second)
+	if done.FileName == "same.bin" {
+		t.Fatalf("second task reused the first task's part: %q", done.FileName)
+	}
+	if got, err := os.ReadFile(done.Path()); err != nil || !bytes.Equal(got, payload) {
+		t.Fatalf("second download corrupt: %v", err)
+	}
+}
+
+// A connection that stops delivering bytes must be dropped and reopened by
+// the health monitor instead of hanging until the much longer stall timeout.
+func TestStalledConnectionIsReplaced(t *testing.T) {
+	payload := make([]byte, 2<<20)
+	for i := range payload {
+		payload[i] = byte(i * 7)
+	}
+	var largeRequests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"stall-v1"`)
+		w.Header().Set("Accept-Ranges", "bytes")
+		var start, end int64
+		if _, err := fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-%d", &start, &end); err != nil {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(payload)
+			return
+		}
+		end = min(end, int64(len(payload)-1))
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(payload)))
+		w.WriteHeader(http.StatusPartialContent)
+		flusher, _ := w.(http.Flusher)
+
+		// Give the probe its single byte without stalling.
+		if start == 0 && end == 0 {
+			_, _ = w.Write(payload[:1])
+			return
+		}
+		if largeRequests.Add(1) == 1 {
+			_, _ = w.Write(payload[start : start+(512<<10)])
+			if flusher != nil {
+				flusher.Flush()
+			}
+			<-r.Context().Done()
+			return
+		}
+		_, _ = w.Write(payload[start : end+1])
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	m := New(&http.Client{}, Config{Dir: dir, Connections: 1, MaxConcurrent: 1}, nil)
+	t.Cleanup(m.Close)
+
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/file.bin", Dir: dir, Connections: 1})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	done := waitStatus(t, m, task.ID, StatusCompleted, 30*time.Second)
+	if got := largeRequests.Load(); got < 2 {
+		t.Fatalf("large requests = %d, want at least 2 (one stalled + one retry)", got)
+	}
+	data, err := os.ReadFile(done.Path())
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	if !bytes.Equal(data, payload) {
+		t.Fatalf("downloaded %d bytes, content mismatch", len(data))
+	}
+}
+
+// Pausing a download must hand its scheduler slot to the next queued task
+// right away instead of waiting for the cancelled worker to unwind.
+func TestPauseFreesQueueSlot(t *testing.T) {
+	slow := testServer(bytes.Repeat([]byte("a"), 8<<20), 30*time.Millisecond, true)
+	defer slow.Close()
+	fast := testServer(bytes.Repeat([]byte("b"), 1<<20), 0, true)
+	defer fast.Close()
+
+	dir := t.TempDir()
+	m := New(&http.Client{}, Config{Dir: dir, Connections: 2, MaxConcurrent: 1}, nil)
+	t.Cleanup(m.Close)
+
+	first, err := m.Create(CreateRequest{URL: slow.URL + "/a.bin", Dir: dir, Connections: 1})
+	if err != nil {
+		t.Fatalf("create first: %v", err)
+	}
+	waitStatus(t, m, first.ID, StatusDownloading, 5*time.Second)
+	m.Pause(first.ID)
+
+	second, err := m.Create(CreateRequest{URL: fast.URL + "/b.bin", Dir: dir, Connections: 1})
+	if err != nil {
+		t.Fatalf("create second: %v", err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if got, ok := m.Get(second.ID); ok && got.Status != StatusQueued {
+			waitStatus(t, m, second.ID, StatusCompleted, 10*time.Second)
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	got, _ := m.Get(second.ID)
+	t.Fatalf("second task stayed %q after pausing the first", got.Status)
+}
+
+func TestConnectionsAreClampedTo64(t *testing.T) {
+	dir := t.TempDir()
+	m := New(&http.Client{}, Config{Dir: dir, Connections: 32, MaxConcurrent: 1}, nil)
+	t.Cleanup(m.Close)
+	for _, want := range []int{64, 64} {
+		task, err := m.Create(CreateRequest{URL: "http://127.0.0.1:1/file", Connections: 100})
+		if err != nil {
+			t.Fatalf("create: %v", err)
+		}
+		if task.Connections != want {
+			t.Fatalf("connections = %d, want %d", task.Connections, want)
+		}
+	}
+}

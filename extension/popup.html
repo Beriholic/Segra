@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Segra</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="popup">
+    <header class="bar">
+      <img src="icons/32.png" alt="" width="20" height="20" />
+      <span class="brand" data-i18n="appName"></span>
+      <span id="dot" class="dot" title=""></span>
+    </header>
+    <main>
+      <label>
+        <span data-i18n="popupUrl"></span>
+        <input id="url" type="url" spellcheck="false" autocomplete="off" />
+      </label>
+      <label>
+        <span data-i18n="popupName"></span>
+        <input id="name" type="text" spellcheck="false" autocomplete="off" />
+      </label>
+      <label>
+        <span data-i18n="popupDir"></span>
+        <input id="dir" type="text" spellcheck="false" autocomplete="off" />
+      </label>
+      <button id="send" class="primary" data-i18n="popupSend"></button>
+      <p id="status" class="status" role="status"></p>
+    </main>
+    <footer>
+      <a id="options" href="#" data-i18n="openOptions"></a>
+      <span id="server" class="muted"></span>
+    </footer>
+    <script src="popup.js"></script>
+  </body>
+</html>

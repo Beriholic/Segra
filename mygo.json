@@ -1,0 +1,12 @@
+{
+  "name": "Segra",
+  "slug": "segra",
+  "identifier": "com.beriholic.segra",
+  "version": "0.1.0",
+  "out": "build",
+  "icon": "resources/icon.png",
+  "urlSchemes": ["segra"],
+  "i18n": { "dir": "locales", "source": "en" },
+  "macos": { "minimumSystemVersion": "12.0" },
+  "linux": { "webview": false, "maintainer": "beriholic" }
+}

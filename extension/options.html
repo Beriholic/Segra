@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Segra</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="options">
+    <header class="bar">
+      <img src="icons/48.png" alt="" width="28" height="28" />
+      <span class="brand" data-i18n="appName"></span>
+    </header>
+    <main>
+      <h1 data-i18n="optionsTitle"></h1>
+      <p class="muted" data-i18n="optionsHint"></p>
+
+      <label>
+        <span data-i18n="optionsPort"></span>
+        <input id="port" type="number" min="1024" max="65535" step="1" />
+      </label>
+      <label>
+        <span data-i18n="optionsToken"></span>
+        <input id="token" type="text" spellcheck="false" autocomplete="off" />
+      </label>
+
+      <div class="row">
+        <button id="save" class="primary" data-i18n="optionsSave"></button>
+        <button id="test" data-i18n="optionsTest"></button>
+      </div>
+
+      <p id="status" class="status" role="status"></p>
+
+      <section id="info" class="card" hidden>
+        <h2 data-i18n="optionsServer"></h2>
+        <dl>
+          <dt data-i18n="optionsServerVersion"></dt>
+          <dd id="info-version"></dd>
+          <dt data-i18n="optionsDownloadDir"></dt>
+          <dd id="info-dir"></dd>
+          <dt data-i18n="optionsConnections"></dt>
+          <dd id="info-connections"></dd>
+        </dl>
+      </section>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

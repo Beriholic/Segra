@@ -1,0 +1,103 @@
+{
+  "appName": {
+    "message": "Segra 下载器"
+  },
+  "appDescription": {
+    "message": "把下载任务交给 Segra 桌面应用。"
+  },
+  "actionTitle": {
+    "message": "发送到 Segra"
+  },
+  "contextLink": {
+    "message": "使用 Segra 下载"
+  },
+  "contextMedia": {
+    "message": "使用 Segra 下载"
+  },
+  "notifSent": {
+    "message": "已发送到 Segra"
+  },
+  "notifFailed": {
+    "message": "Segra 未能接收下载"
+  },
+  "errorServer": {
+    "message": "Segra 没有运行。请打开应用后重试。"
+  },
+  "errorToken": {
+    "message": "API 令牌不正确。请从 Segra 设置中复制并粘贴到这里。"
+  },
+  "errorUrl": {
+    "message": "请输入下载链接。"
+  },
+  "errorPort": {
+    "message": "端口必须在 1024 到 65535 之间。"
+  },
+  "popupUrl": {
+    "message": "链接"
+  },
+  "popupName": {
+    "message": "文件名（可选）"
+  },
+  "popupDir": {
+    "message": "保存到（可选）"
+  },
+  "popupSend": {
+    "message": "使用 Segra 下载"
+  },
+  "popupSending": {
+    "message": "正在发送…"
+  },
+  "popupSent": {
+    "message": "已加入 Segra 队列"
+  },
+  "popupNoServer": {
+    "message": "Segra 没有运行"
+  },
+  "statusOnline": {
+    "message": "已连接"
+  },
+  "openOptions": {
+    "message": "设置"
+  },
+  "optionsTitle": {
+    "message": "Segra 扩展设置"
+  },
+  "optionsHint": {
+    "message": "打开 Segra → 设置，复制 API 令牌并粘贴到这里。端口显示在令牌旁边。"
+  },
+  "optionsPort": {
+    "message": "API 端口"
+  },
+  "optionsToken": {
+    "message": "API 令牌"
+  },
+  "optionsSave": {
+    "message": "保存"
+  },
+  "optionsTest": {
+    "message": "测试连接"
+  },
+  "optionsSaved": {
+    "message": "已保存。"
+  },
+  "optionsOk": {
+    "message": "已连接到 Segra $VERSION$。",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsServer": {
+    "message": "已连接的应用"
+  },
+  "optionsServerVersion": {
+    "message": "版本"
+  },
+  "optionsDownloadDir": {
+    "message": "下载文件夹"
+  },
+  "optionsConnections": {
+    "message": "连接数"
+  }
+}

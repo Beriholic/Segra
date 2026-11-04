@@ -1,0 +1,105 @@
+{
+  "appName": {
+    "message": "Segra Downloader",
+    "description": "The extension's name."
+  },
+  "appDescription": {
+    "message": "Hand downloads to the Segra desktop app.",
+    "description": "The extension's description."
+  },
+  "actionTitle": {
+    "message": "Send to Segra"
+  },
+  "contextLink": {
+    "message": "Download with Segra"
+  },
+  "contextMedia": {
+    "message": "Download with Segra"
+  },
+  "notifSent": {
+    "message": "Sent to Segra"
+  },
+  "notifFailed": {
+    "message": "Segra didn't take the download"
+  },
+  "errorServer": {
+    "message": "Segra is not running. Open the app and try again."
+  },
+  "errorToken": {
+    "message": "Wrong API token. Copy it from Segra's Settings and paste it here."
+  },
+  "errorUrl": {
+    "message": "Enter a link to download."
+  },
+  "errorPort": {
+    "message": "The port must be between 1024 and 65535."
+  },
+  "popupUrl": {
+    "message": "Link"
+  },
+  "popupName": {
+    "message": "File name (optional)"
+  },
+  "popupDir": {
+    "message": "Save to (optional)"
+  },
+  "popupSend": {
+    "message": "Download with Segra"
+  },
+  "popupSending": {
+    "message": "Sending…"
+  },
+  "popupSent": {
+    "message": "Queued in Segra"
+  },
+  "popupNoServer": {
+    "message": "Segra is not running"
+  },
+  "statusOnline": {
+    "message": "Connected"
+  },
+  "openOptions": {
+    "message": "Settings"
+  },
+  "optionsTitle": {
+    "message": "Segra extension settings"
+  },
+  "optionsHint": {
+    "message": "Open Segra → Settings, then copy the API token here. The port is shown next to it."
+  },
+  "optionsPort": {
+    "message": "API port"
+  },
+  "optionsToken": {
+    "message": "API token"
+  },
+  "optionsSave": {
+    "message": "Save"
+  },
+  "optionsTest": {
+    "message": "Test connection"
+  },
+  "optionsSaved": {
+    "message": "Saved."
+  },
+  "optionsOk": {
+    "message": "Connected to Segra $VERSION$.",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsServer": {
+    "message": "Connected app"
+  },
+  "optionsServerVersion": {
+    "message": "Version"
+  },
+  "optionsDownloadDir": {
+    "message": "Download folder"
+  },
+  "optionsConnections": {
+    "message": "Connections"
+  }
+}
