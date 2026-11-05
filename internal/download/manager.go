@@ -2,6 +2,7 @@ package download
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 	"sync"
 )
@@ -35,13 +36,58 @@ func New(client *http.Client, cfg Config, notify func()) *Manager {
 		tasks:   make(map[string]*Task),
 		running: make(map[string]context.CancelFunc),
 		cfg:     cfg.withDefaults(),
-		client:  client,
+		client:  separateConnections(client),
 		notify:  notify,
 		wakeCh:  make(chan struct{}, 1),
 		stop:    make(chan struct{}),
 	}
 	go m.loop()
 	return m
+}
+
+// separateConnections returns a copy of c that speaks HTTP/1.1, so that each
+// worker's range request gets its own TCP connection.
+//
+// A segmented download is only fast because every worker owns a connection
+// with its own congestion window. Over HTTP/2 all the range requests are
+// streams of a single connection sharing one flow-control window, and a CDN
+// that stops returning window updates blocks every stream in turn: each one
+// waits in writeRequest for room to send, with no body yet, so no timeout
+// fires and the download sits at zero bytes for good. That is what a 32
+// connection download of an Aliyun OSS object behind EdgeOne did.
+//
+// The caller's transport is left alone, since MyGo shares it with the
+// updater and the fetch plugin; the copy carries its proxy and pool
+// settings, and TLS still negotiates h2 for anything else using it.
+func separateConnections(c *http.Client) *http.Client {
+	var tr *http.Transport
+	switch t := c.Transport.(type) {
+	case *http.Transport:
+		tr = t.Clone()
+	case nil:
+		tr = http.DefaultTransport.(*http.Transport).Clone()
+	default:
+		// Some other round tripper (a proxy wrapper, a recorder): leave it
+		// as it is. The watchdogs keep a stuck request from hanging.
+		return c
+	}
+	tr.ForceAttemptHTTP2 = false
+	// ForceAttemptHTTP2 only stops the transport from adding h2 itself; an
+	// empty TLS protocol map also refuses the server's ALPN offer.
+	tr.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	// Turning h2 off leaves Go advertising no ALPN at all, and a network or
+	// CDN that expects one drops the handshake: github.com closed the
+	// connection with EOF for exactly this. Say what the connection speaks,
+	// the way curl does for --http1.1.
+	if tr.TLSClientConfig == nil {
+		tr.TLSClientConfig = &tls.Config{}
+	} else {
+		tr.TLSClientConfig = tr.TLSClientConfig.Clone()
+	}
+	tr.TLSClientConfig.NextProtos = []string{"http/1.1"}
+	out := *c
+	out.Transport = tr
+	return &out
 }
 
 // SetOnEvent installs the listener for completed, failed and created tasks.

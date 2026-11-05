@@ -19,15 +19,29 @@ var (
 	errRestart = errors.New("transfer must restart")
 	// errPermanent marks an error that retrying cannot fix.
 	errPermanent = errors.New("permanent failure")
+	// errStalled means the server stopped sending without the user
+	// pausing: a watchdog cut this connection. It ends the download with
+	// a message, instead of leaving the task "downloading" at zero bytes.
+	errStalled = errors.New("connection stalled: the server stopped sending data")
 )
 
 const (
 	// A browser user agent: some CDNs throttle clients that look like bots.
 	defaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 	probeTimeout     = 30 * time.Second
-	stallTimeout     = 10 * time.Second
 	maxAttempts      = 4
 	copyBufferSize   = 512 << 10
+)
+
+// Timeouts for a single connection, variables so tests can shrink them.
+var (
+	// stallTimeout bounds the silence between two reads of a body.
+	stallTimeout = 10 * time.Second
+	// headerTimeout bounds the wait for response headers. Without it a
+	// server that accepts the connection and then says nothing holds the
+	// worker forever: no body has arrived for stallTimeout to watch, and a
+	// request that never got its headers cannot fail on its own.
+	headerTimeout = 20 * time.Second
 )
 
 var copyBufPool = sync.Pool{
@@ -231,6 +245,12 @@ func fetchRange(ctx context.Context, client *http.Client, in CreateRequest, m *t
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		if errors.Is(err, context.Canceled) {
+			// One of our own watchdogs cut this attempt, not the user:
+			// hand it back so the caller re-opens the connection and
+			// counts a reconnect.
+			return errStalled
+		}
 		var he *httpError
 		if errors.As(err, &he) {
 			if he.Status >= 400 && he.Status < 500 && he.Status != http.StatusTooManyRequests {
@@ -271,7 +291,11 @@ func fetchRangeOnce(ctx context.Context, client *http.Client, in CreateRequest, 
 		req.Header.Set("If-Range", m.LastMod)
 	}
 
+	// A request that never receives its headers would block here forever,
+	// with no body to time out: cut it instead.
+	waiting := time.AfterFunc(headerTimeout, cancelReq)
 	resp, err := client.Do(req)
+	waiting.Stop()
 	if err != nil {
 		return err
 	}
@@ -344,6 +368,12 @@ func fetchSingle(ctx context.Context, client *http.Client, in CreateRequest, m *
 		}
 		attempts++
 		if attempts >= maxAttempts {
+			// The stream cannot resume, so every attempt starts again at
+			// zero: a stream cut by a watchdog ends the task with a
+			// message rather than reading as a pause.
+			if errors.Is(err, context.Canceled) {
+				return errStalled
+			}
 			return err
 		}
 		select {
@@ -362,7 +392,11 @@ func fetchSingleOnce(ctx context.Context, client *http.Client, in CreateRequest,
 		return err
 	}
 	applyHeaders(req, CreateRequest{URL: m.URL, Referer: m.Referer, UserAgent: m.UserAgent, Cookie: m.Cookie})
+	// Same guard as the ranged path: headers that never arrive must not
+	// hold the connection open for the rest of the download.
+	waiting := time.AfterFunc(headerTimeout, cancelReq)
 	resp, err := client.Do(req)
+	waiting.Stop()
 	if err != nil {
 		return err
 	}

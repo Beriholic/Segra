@@ -488,3 +488,96 @@ func TestConnectionsAreClampedTo64(t *testing.T) {
 		}
 	}
 }
+
+// The downloader must own its connections: one TCP connection per worker,
+// and never the caller's transport. Sharing a single HTTP/2 connection
+// starves every worker at once when the CDN stops returning window updates,
+// which is a download stuck at zero bytes, not a slow one.
+func TestDownloaderOwnsItsConnections(t *testing.T) {
+	caller := &http.Transport{ForceAttemptHTTP2: true, MaxIdleConnsPerHost: 7}
+	m := New(&http.Client{Transport: caller}, Config{Dir: t.TempDir(), Connections: 8}, nil)
+	t.Cleanup(m.Close)
+
+	tr, ok := m.client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("manager transport = %T, want *http.Transport", m.client.Transport)
+	}
+	if tr == caller {
+		t.Fatal("manager reconfigured the caller's transport")
+	}
+	if tr.ForceAttemptHTTP2 || len(tr.TLSNextProto) != 0 {
+		t.Fatal("manager allows HTTP/2: the workers would share one connection's flow-control window")
+	}
+	if tr.MaxIdleConnsPerHost != 7 {
+		t.Fatalf("idle connections per host = %d, want the caller's 7", tr.MaxIdleConnsPerHost)
+	}
+	// HTTP/1.1 must still be offered over ALPN. Turning h2 off makes Go
+	// send no ALPN at all, and a CDN that wants one resets the handshake:
+	// github.com answered a download with EOF until the downloader named
+	// http/1.1 itself.
+	if tr.TLSClientConfig == nil || len(tr.TLSClientConfig.NextProtos) == 0 {
+		t.Fatal("manager sends no ALPN: some hosts close the connection instead of answering")
+	}
+	if got := tr.TLSClientConfig.NextProtos[0]; got != "http/1.1" {
+		t.Fatalf("ALPN = %q, want http/1.1", got)
+	}
+	// The caller's transport is shared with the rest of the app, which may
+	// still want h2. (Clone registers h2 on it lazily, the way any first
+	// use does; that is Go's initialisation, not our change.)
+	if !caller.ForceAttemptHTTP2 {
+		t.Fatal("manager disabled HTTP/2 on the caller's transport")
+	}
+}
+
+// A server that takes the connection and then says nothing must end the
+// download with an error. It used to sit in "downloading" at zero bytes
+// forever, because the worker's own cancellation was read as a pause.
+func TestSilentServerFailsInsteadOfHanging(t *testing.T) {
+	shrink := func(dst *time.Duration, v time.Duration) {
+		old := *dst
+		*dst = v
+		t.Cleanup(func() { *dst = old })
+	}
+	oldMax := maxReconnects
+	maxReconnects = 2
+	t.Cleanup(func() { maxReconnects = oldMax })
+	shrink(&healthInterval, 20*time.Millisecond)
+	shrink(&healthGrace, 40*time.Millisecond)
+	shrink(&stallAfter, 20*time.Millisecond)
+	shrink(&stallTimeout, 100*time.Millisecond)
+	shrink(&headerTimeout, 100*time.Millisecond)
+
+	payload := make([]byte, 2<<20)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"silent-v1"`)
+		w.Header().Set("Accept-Ranges", "bytes")
+		var start, end int64
+		if _, err := fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-%d", &start, &end); err != nil {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		end = min(end, int64(len(payload)-1))
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(payload)))
+		w.WriteHeader(http.StatusPartialContent)
+		if start == 0 && end == 0 {
+			_, _ = w.Write(payload[:1])
+			return
+		}
+		// Accept the range, send nothing, keep the connection open.
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	m := New(&http.Client{}, Config{Dir: dir, Connections: 4, MaxConcurrent: 1}, nil)
+	t.Cleanup(m.Close)
+
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/file.bin", Dir: dir, Connections: 4})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	failed := waitStatus(t, m, task.ID, StatusFailed, 20*time.Second)
+	if !strings.Contains(failed.Error, "stalled") {
+		t.Fatalf("error = %q, want it to name the stalled connection", failed.Error)
+	}
+}

@@ -11,13 +11,16 @@ import (
 // that stops delivering bytes, or that runs far below the mean speed of its
 // peers, is dropped and re-opened. On CDNs that throttle individual
 // connections this is what keeps aggregate throughput high.
-const (
+//
+// Variables so that tests can shrink them; nothing else changes them.
+var (
 	healthInterval = 1 * time.Second
 	healthGrace    = 4 * time.Second
 	stallAfter     = 3 * time.Second
-	slowRatio      = 0.30
 	maxReconnects  = 8
 )
+
+const slowRatio = 0.30
 
 // workerHealth is the live state of one connection while it streams a
 // segment. All fields read by the health loop are atomic.

@@ -298,7 +298,13 @@ func (m *Manager) fetchSegment(ctx context.Context, w int, i int, tracker *healt
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if !errors.Is(err, context.Canceled) {
+		// Both a dropped connection and our own watchdog read as cancelled.
+		// Neither is a pause: reopen the connection, keeping the bytes
+		// already written, and give up with a message once that stops
+		// helping. Returning the bare context error here ended in a task
+		// that stayed "downloading" forever, since fail() reads it as a
+		// pause and stays quiet.
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, errStalled) {
 			return err
 		}
 		mu.Lock()
@@ -311,7 +317,7 @@ func (m *Manager) fetchSegment(ctx context.Context, w int, i int, tracker *healt
 		}
 		lastDone = done
 		if reconnects > maxReconnects {
-			return err
+			return errStalled
 		}
 		select {
 		case <-ctx.Done():

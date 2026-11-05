@@ -85,7 +85,6 @@ func (a *App) start() {
 	// same pool shape.
 	transport.MaxIdleConns = 128
 	transport.MaxIdleConnsPerHost = 64
-	transport.ForceAttemptHTTP2 = true
 	transport.IdleConnTimeout = 90 * time.Second
 	transport.TLSHandshakeTimeout = 10 * time.Second
 	transport.ResponseHeaderTimeout = 30 * time.Second
