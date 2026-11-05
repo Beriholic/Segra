@@ -3,7 +3,10 @@ package download
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math/rand/v2"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -42,9 +45,18 @@ func (m *Manager) prepare(ctx context.Context, t *Task) (*taskMeta, string, stri
 			if t.Cookie == "" {
 				t.Cookie = old.Cookie
 			}
+			// The probe just walked the redirect chain, so it holds a
+			// signed URL that is newer than the one in the file: CDNs hand
+			// out links that expire, and a download paused overnight must
+			// not come back to a 403.
+			old.URL = probe.FinalURL
+			old.FinalURL = probe.FinalURL
+			old.ETag = probe.ETag
+			old.LastMod = probe.LastMod
 			m.mu.Lock()
 			t.Size = old.Size
 			t.Downloaded = old.downloaded()
+			t.Segments = progressOf(old.Segments)
 			t.Resumable = true
 			t.FinalURL = probe.FinalURL
 			t.ETag = probe.ETag
@@ -96,6 +108,7 @@ func (m *Manager) prepare(ctx context.Context, t *Task) (*taskMeta, string, stri
 	m.mu.Lock()
 	t.Size = probe.Size
 	t.Downloaded = 0
+	t.Segments = progressOf(segs)
 	t.Resumable = probe.Ranges
 	t.FinalURL = probe.FinalURL
 	t.ETag = probe.ETag
@@ -160,7 +173,7 @@ func (m *Manager) transfer(ctx context.Context, t *Task, meta *taskMeta, f *os.F
 				snap := snapshot()
 				mu.Unlock()
 				rate := meter.update(total, time.Now())
-				m.progress(t.ID, total, int64(rate))
+				m.progress(t.ID, total, int64(rate), progressOf(snap.Segments))
 				ticks++
 				if ticks%10 == 0 {
 					_ = writeMeta(metaPath, snap)
@@ -190,10 +203,32 @@ func (m *Manager) transfer(ctx context.Context, t *Task, meta *taskMeta, f *os.F
 		if workers > len(meta.Segments) {
 			workers = len(meta.Segments)
 		}
-		jobs := make(chan int)
+		// The count is read once, before any worker can append a stolen
+		// range to the list.
+		ranges := len(meta.Segments)
+		jobs := make(chan int, ranges)
 		tracker := newHealthTracker(workers)
 		healthCtx, stopHealth := context.WithCancel(ctx)
-		go tracker.watch(healthCtx)
+		healthDone := make(chan struct{})
+		go func() {
+			defer close(healthDone)
+			tracker.watch(healthCtx)
+		}()
+
+		// closeQueue ends the worker loop once no range has a byte left.
+		// Every worker may notice it; only the first close counts.
+		var closeOnce sync.Once
+		closeQueue := func() { closeOnce.Do(func() { close(jobs) }) }
+		allWritten := func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			for _, s := range meta.Segments {
+				if l := s.length(); l < 0 || l > s.Done {
+					return false
+				}
+			}
+			return true
+		}
 
 		var wg sync.WaitGroup
 		var errMu sync.Mutex
@@ -201,31 +236,73 @@ func (m *Manager) transfer(ctx context.Context, t *Task, meta *taskMeta, f *os.F
 			wg.Add(1)
 			go func(worker int) {
 				defer wg.Done()
-				for i := range jobs {
+				retry := time.NewTicker(stealRetry)
+				defer retry.Stop()
+
+				stop := func(e error) {
+					errMu.Lock()
+					if err == nil {
+						err = e
+					}
+					errMu.Unlock()
+					cancel()
+				}
+				run := func(i int) bool {
 					if e := m.fetchSegment(ctx, worker, i, tracker, in, meta, f, &mu); e != nil {
-						errMu.Lock()
-						if err == nil {
-							err = e
+						stop(e)
+						return false
+					}
+					if allWritten() {
+						closeQueue()
+					}
+					return true
+				}
+
+				for {
+					select {
+					case i, ok := <-jobs:
+						if !ok {
+							return
 						}
-						errMu.Unlock()
-						cancel()
+						if !run(i) {
+							return
+						}
+						continue
+					default:
+					}
+
+					// Nothing queued: take the back half of the range with
+					// the most left, as Surge's balancer does.
+					if i, ok := stealWork(meta, &mu, tracker); ok {
+						if !run(i) {
+							return
+						}
+						continue
+					}
+					select {
+					case <-ctx.Done():
 						return
+					case i, ok := <-jobs:
+						if !ok {
+							return
+						}
+						if !run(i) {
+							return
+						}
+					case <-retry.C:
 					}
 				}
 			}(w)
 		}
-		go func() {
-			defer close(jobs)
-			for i := range meta.Segments {
-				select {
-				case <-ctx.Done():
-					return
-				case jobs <- i:
-				}
-			}
-		}()
+		// Every range goes out at once, one per worker: with the file cut
+		// once per connection there is nothing left to queue after that.
+		for i := 0; i < ranges; i++ {
+			jobs <- i
+		}
 		wg.Wait()
 		stopHealth()
+		// Do not leave the loop reading worker state after the transfer.
+		<-healthDone
 		cancel()
 	}
 	<-done
@@ -239,6 +316,76 @@ func (m *Manager) transfer(ctx context.Context, t *Task, meta *taskMeta, f *os.F
 		return err
 	}
 	return err
+}
+
+// stealRetry is how often a worker with nothing queued looks again for a
+// range worth splitting.
+const stealRetry = 25 * time.Millisecond
+
+// stealAlign keeps a stolen range on a 4 KiB boundary, as the servers and
+// Surge's own splitter do.
+const stealAlign = 4 << 10
+
+// minSteal is the least a range must have left on both sides of the split
+// before it is worth taking. A variable so a test can shrink it.
+var minSteal = int64(1 << 20)
+
+// stealWork takes the back half of the range with the most bytes left and
+// returns it for the worker that has nothing queued. The owner's request is
+// cancelled and reopens on the shorter half, keeping the bytes it already
+// wrote. This is Surge's balancer in miniature: the work goes to the idle
+// connection instead of that connection waiting out a slow one.
+func stealWork(meta *taskMeta, mu *sync.Mutex, tracker *healthTracker) (int, bool) {
+	mu.Lock()
+	best, bestLeft := -1, int64(0)
+	for i, s := range meta.Segments {
+		if left := s.length() - s.Done; left > bestLeft {
+			best, bestLeft = i, left
+		}
+	}
+	if best < 0 || bestLeft < 2*minSteal {
+		mu.Unlock()
+		return 0, false
+	}
+	seg := meta.Segments[best]
+	split := (seg.Done + bestLeft/2) / stealAlign * stealAlign
+	if split <= seg.Done || split >= seg.length() {
+		mu.Unlock()
+		return 0, false
+	}
+	tail := segmentState{Start: seg.Start + split, End: seg.End}
+	meta.Segments[best].End = tail.Start - 1
+	if meta.Segments[best].Done > split {
+		meta.Segments[best].Done = split
+	}
+	meta.Segments = append(meta.Segments, tail)
+	index := len(meta.Segments) - 1
+	mu.Unlock()
+
+	// Interrupt the owner so it reopens on the half it keeps; if it is
+	// between attempts it will read the shorter range next time anyway.
+	for w, wh := range tracker.workers {
+		if wh.active.Load() && int(wh.seg.Load()) == best {
+			tracker.cancelAttempt(w)
+			break
+		}
+	}
+	return index, true
+}
+
+// stallFailure builds what the task shows once a segment has spent
+// stallBudget without a byte. A watchdog cut is a stall; a network error
+// that never let a byte through is worth naming, minus the URL the task
+// already carries and the UI has no room for.
+func stallFailure(last error) error {
+	var ue *url.Error
+	if errors.As(last, &ue) {
+		last = ue.Err
+	}
+	if last == nil || errors.Is(last, context.Canceled) || errors.Is(last, errStalled) {
+		return fmt.Errorf("%w (gave up after %s)", errStalled, stallBudget)
+	}
+	return fmt.Errorf("%w: %v (gave up after %s)", errUnreachable, last, stallBudget)
 }
 
 func probeWithRetry(ctx context.Context, client *http.Client, in CreateRequest) (*probeResult, error) {
@@ -271,8 +418,11 @@ func probeWithRetry(ctx context.Context, client *http.Client, in CreateRequest) 
 func (m *Manager) fetchSegment(ctx context.Context, w int, i int, tracker *healthTracker, in CreateRequest, meta *taskMeta, f *os.File, mu *sync.Mutex) error {
 	mu.Lock()
 	lastDone := meta.Segments[i].Done
+	lastEnd := meta.Segments[i].End
 	mu.Unlock()
 	reconnects := 0
+	lastProgress := time.Now()
+	var lastErr error
 
 	for {
 		attemptCtx, cancel := context.WithCancel(ctx)
@@ -281,10 +431,21 @@ func (m *Manager) fetchSegment(ctx context.Context, w int, i int, tracker *healt
 		mu.Lock()
 		local := meta.Segments[i]
 		mu.Unlock()
+		if local.End != lastEnd {
+			// A steal shortened the range under us: the bytes are safe, and
+			// this is progress, not another failed attempt.
+			lastEnd = local.End
+			reconnects = 0
+		}
 		add := func(n int64) {
 			local.Done += n
 			tracker.add(w, n)
 			mu.Lock()
+			if l := meta.Segments[i].length(); l >= 0 && local.Done > l {
+				// Written past the shortened end before the cancel landed;
+				// the tail is the thief's to account for.
+				local.Done = l
+			}
 			meta.Segments[i].Done = local.Done
 			mu.Unlock()
 		}
@@ -298,31 +459,53 @@ func (m *Manager) fetchSegment(ctx context.Context, w int, i int, tracker *healt
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		// Both a dropped connection and our own watchdog read as cancelled.
-		// Neither is a pause: reopen the connection, keeping the bytes
-		// already written, and give up with a message once that stops
-		// helping. Returning the bare context error here ended in a task
-		// that stayed "downloading" forever, since fail() reads it as a
-		// pause and stays quiet.
-		if !errors.Is(err, context.Canceled) && !errors.Is(err, errStalled) {
+		// Only a file that has to restart, or a request the server
+		// rejected outright, ends this segment here. Everything else -- our
+		// watchdog cutting a silent connection, a reset, a TLS handshake
+		// that never finished -- is the network having a bad minute, and
+		// stallBudget below decides when that minute has lasted long
+		// enough.
+		//
+		// Returning any other error killed the whole download the moment
+		// four reconnects in a row failed: over a hotspot a burst of TLS
+		// handshake timeouts is what four seconds of congestion looks
+		// like, and the task died a fifth of the way into the file.
+		if errors.Is(err, errRestart) || errors.Is(err, errPermanent) {
 			return err
 		}
+		var he *httpError
+		if errors.As(err, &he) && he.Status >= 400 && he.Status < 500 && he.Status != http.StatusTooManyRequests {
+			return err
+		}
+		lastErr = err
 		mu.Lock()
 		done := meta.Segments[i].Done
 		mu.Unlock()
 		if done > lastDone {
 			reconnects = 0
+			lastProgress = time.Now()
 		} else {
 			reconnects++
 		}
 		lastDone = done
-		if reconnects > maxReconnects {
-			return errStalled
+		if time.Since(lastProgress) > stallBudget {
+			return stallFailure(lastErr)
 		}
+		// Back off further after every attempt that brought nothing, so a
+		// server that stopped answering is not hammered while the network
+		// sorts itself out.
+		delay := 150 * time.Millisecond
+		if reconnects > 0 {
+			delay = min(150*time.Millisecond<<min(reconnects, 5), 5*time.Second)
+		}
+		// Spread the retries out. Thirty-two workers reopening their TLS
+		// connection on the same tick is what makes a thin link time the
+		// handshakes out in the first place.
+		delay += rand.N(delay / 2)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(150 * time.Millisecond):
+		case <-time.After(delay):
 		}
 	}
 }

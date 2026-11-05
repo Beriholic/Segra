@@ -88,7 +88,7 @@ func testManager(t *testing.T, dir string) (*Manager, chan Event) {
 }
 
 func TestWorkerPoolBalancesChunks(t *testing.T) {
-	// 16 MB triggers extra chunking: 8 chunks of 2 MB for 4 connections.
+	// 16 MB over 4 connections: four ranges of 4 MB, one per worker.
 	payload := bytes.Repeat([]byte("0123456789abcdef"), 1<<20)
 	var requests, violations int32
 	sem := make(chan struct{}, 4)
@@ -144,8 +144,8 @@ func TestWorkerPoolBalancesChunks(t *testing.T) {
 	if got := atomic.LoadInt32(&violations); got != 0 {
 		t.Fatalf("saw %d requests beyond the 4 workers", got)
 	}
-	if got := atomic.LoadInt32(&requests); got < 8 {
-		t.Fatalf("requests = %d, want at least 8 chunks", got)
+	if got := atomic.LoadInt32(&requests); got < 4 {
+		t.Fatalf("requests = %d, want at least one per connection", got)
 	}
 }
 
@@ -538,9 +538,9 @@ func TestSilentServerFailsInsteadOfHanging(t *testing.T) {
 		*dst = v
 		t.Cleanup(func() { *dst = old })
 	}
-	oldMax := maxReconnects
-	maxReconnects = 2
-	t.Cleanup(func() { maxReconnects = oldMax })
+	oldBudget := stallBudget
+	stallBudget = 300 * time.Millisecond
+	t.Cleanup(func() { stallBudget = oldBudget })
 	shrink(&healthInterval, 20*time.Millisecond)
 	shrink(&healthGrace, 40*time.Millisecond)
 	shrink(&stallAfter, 20*time.Millisecond)
@@ -579,5 +579,140 @@ func TestSilentServerFailsInsteadOfHanging(t *testing.T) {
 	failed := waitStatus(t, m, task.ID, StatusFailed, 20*time.Second)
 	if !strings.Contains(failed.Error, "stalled") {
 		t.Fatalf("error = %q, want it to name the stalled connection", failed.Error)
+	}
+}
+
+// A burst of connection failures -- the TLS handshake timing out, the
+// socket reset before the headers -- must not kill the download. A hotspot
+// produces exactly that, and the task used to fail at the first quiet
+// second: four reconnects in a row was all it took.
+func TestConnectionDropoutsDoNotFailDownload(t *testing.T) {
+	payload := bytes.Repeat([]byte("0123456789abcdef"), 64<<10) // 1 MiB
+	var dropped atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Range") != "bytes=0-0" && dropped.Add(1) <= 16 {
+			// Gone before a byte of response, the way a timed-out
+			// handshake or a reset connection looks to the client.
+			if hj, ok := w.(http.Hijacker); ok {
+				if conn, _, err := hj.Hijack(); err == nil {
+					_ = conn.Close()
+					return
+				}
+			}
+			return
+		}
+		w.Header().Set("ETag", `"test-v1"`)
+		w.Header().Set("Accept-Ranges", "bytes")
+		if r.Header.Get("Range") == "bytes=0-0" {
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes 0-0/%d", len(payload)))
+			w.WriteHeader(http.StatusPartialContent)
+			_, _ = w.Write(payload[:1])
+			return
+		}
+		var start, end int
+		if _, err := fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-%d", &start, &end); err != nil {
+			http.Error(w, "bad range", http.StatusBadRequest)
+			return
+		}
+		end = min(end, len(payload)-1)
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(payload)))
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write(payload[start : end+1])
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	m := New(&http.Client{}, Config{Dir: dir, Connections: 4, MaxConcurrent: 1}, nil)
+	t.Cleanup(m.Close)
+
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/file.bin", Dir: dir, Connections: 4})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	done := waitStatus(t, m, task.ID, StatusCompleted, 60*time.Second)
+	if done.Downloaded != int64(len(payload)) {
+		t.Fatalf("downloaded %d, want %d", done.Downloaded, len(payload))
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "file.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatal("downloaded bytes differ from payload")
+	}
+	if n := dropped.Load(); n < 16 {
+		t.Fatalf("server dropped %d connections, want the full 16", n)
+	}
+}
+
+// Resuming must use the redirect the probe just walked, not the URL saved
+// in the .part file: CDN links are signed and expire, and a task paused
+// overnight came back to a 403.
+func TestResumeRefreshesSignedURL(t *testing.T) {
+	payload := bytes.Repeat([]byte("s"), 512*1024)
+	var token atomic.Int32
+	token.Store(1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/file.bin" {
+			http.Redirect(w, r, fmt.Sprintf("/cdn/file.bin?token=%d", token.Load()), http.StatusFound)
+			return
+		}
+		if r.URL.Query().Get("token") != strconv.Itoa(int(token.Load())) {
+			http.Error(w, "link expired", http.StatusForbidden)
+			return
+		}
+		w.Header().Set("ETag", `"signed-v1"`)
+		w.Header().Set("Accept-Ranges", "bytes")
+		var start, end int
+		if _, err := fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-%d", &start, &end); err != nil {
+			http.Error(w, "bad range", http.StatusBadRequest)
+			return
+		}
+		end = min(end, len(payload)-1)
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(payload)))
+		w.WriteHeader(http.StatusPartialContent)
+		chunk := payload[start : end+1]
+		flusher, _ := w.(http.Flusher)
+		for len(chunk) > 0 {
+			n := min(4096, len(chunk))
+			if _, err := w.Write(chunk[:n]); err != nil {
+				return
+			}
+			chunk = chunk[n:]
+			if flusher != nil {
+				flusher.Flush()
+			}
+			time.Sleep(3 * time.Millisecond)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	m, _ := testManager(t, dir)
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/file.bin", Connections: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		cur, _ := m.Get(task.ID)
+		if cur.Downloaded > 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	m.Pause(task.ID)
+	waitStatus(t, m, task.ID, StatusPaused, 5*time.Second)
+
+	// The link in the .part file is now dead; only a fresh probe helps.
+	token.Store(2)
+	m.Resume(task.ID)
+	waitStatus(t, m, task.ID, StatusCompleted, 20*time.Second)
+	got, err := os.ReadFile(filepath.Join(dir, "file.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("resumed file has %d bytes, want %d", len(got), len(payload))
 	}
 }

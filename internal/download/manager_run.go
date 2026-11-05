@@ -149,6 +149,18 @@ func (m *Manager) complete(t *Task, size int64) {
 	t.CompletedAt = time.Now()
 	t.Speed = 0
 	t.Error = ""
+	// Every block is on disk now. Copy rather than write through the slice:
+	// a snapshot the UI holds may still be reading it.
+	if len(t.Segments) > 0 {
+		segs := make([]SegmentProgress, len(t.Segments))
+		for i, s := range t.Segments {
+			if s.Total > 0 {
+				s.Done = s.Total
+			}
+			segs[i] = s
+		}
+		t.Segments = segs
+	}
 	snapshot := *t
 	m.mu.Unlock()
 	m.emit(EventCompleted, &snapshot)

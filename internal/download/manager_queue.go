@@ -41,11 +41,14 @@ func (m *Manager) Create(req CreateRequest) (Task, error) {
 	m.tasks[t.ID] = t
 	m.order = append(m.order, t.ID)
 	m.queue = append(m.queue, t.ID)
+	// The queue may start it before this returns, so the copy has to be
+	// taken under the lock the pump writes through.
+	snap := *t
 	m.mu.Unlock()
-	m.emit(EventCreated, t)
+	m.emit(EventCreated, &snap)
 	m.changed()
 	m.wake()
-	return *t, nil
+	return snap, nil
 }
 
 // Pause stops a task, keeping its partial file for a later resume.

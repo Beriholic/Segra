@@ -115,16 +115,19 @@ func (m *Manager) Config() Config {
 // Load adds tasks read from disk. Tasks that were downloading are marked
 // paused so the user can resume them.
 func (m *Manager) Load(tasks []Task) {
+	// Status first, then the metadata read: only a paused or failed task has
+	// a .part file to read block progress from.
+	for i := range tasks {
+		switch tasks[i].Status {
+		case StatusDownloading, StatusQueued:
+			tasks[i].Status = StatusPaused
+		}
+		restoreSegments(&tasks[i])
+	}
+
 	m.mu.Lock()
 	for i := range tasks {
 		t := tasks[i]
-		switch t.Status {
-		case StatusDownloading, StatusQueued:
-			t.Status = StatusPaused
-		}
-		if t.Status == StatusFailed && t.Downloaded <= 0 {
-			// keep the failure visible
-		}
 		if _, ok := m.tasks[t.ID]; ok {
 			continue
 		}
@@ -212,11 +215,12 @@ func (m *Manager) emit(kind EventKind, t *Task) {
 	}
 }
 
-func (m *Manager) progress(id string, downloaded, speed int64) {
+func (m *Manager) progress(id string, downloaded, speed int64, segments []SegmentProgress) {
 	m.mu.Lock()
 	if t := m.tasks[id]; t != nil {
 		t.Downloaded = downloaded
 		t.Speed = speed
+		t.Segments = segments
 	}
 	m.mu.Unlock()
 	m.changed()

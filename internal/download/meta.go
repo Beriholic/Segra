@@ -24,6 +24,29 @@ func (s segmentState) length() int64 {
 	return s.End - s.Start + 1
 }
 
+// progressOf turns the ranges of a meta into what the panel draws.
+func progressOf(segs []segmentState) []SegmentProgress {
+	out := make([]SegmentProgress, len(segs))
+	for i, s := range segs {
+		out[i] = SegmentProgress{Start: s.Start, Done: s.Done, Total: s.length()}
+	}
+	return out
+}
+
+// restoreSegments gives a paused or failed task the block progress its .part
+// metadata recorded, so the panel shows real blocks before the user resumes
+// it. It reads one small file per task, once, at startup.
+func restoreSegments(t *Task) {
+	if len(t.Segments) > 0 || (t.Status != StatusPaused && t.Status != StatusFailed) {
+		return
+	}
+	meta, err := readMeta(MetadataPath(t.PartPath()))
+	if err != nil || meta.TaskID != t.ID || len(meta.Segments) == 0 {
+		return
+	}
+	t.Segments = progressOf(meta.Segments)
+}
+
 // taskMeta is persisted next to the .part file so a download can resume
 // after a restart.
 type taskMeta struct {

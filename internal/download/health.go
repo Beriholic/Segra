@@ -17,7 +17,10 @@ var (
 	healthInterval = 1 * time.Second
 	healthGrace    = 4 * time.Second
 	stallAfter     = 3 * time.Second
-	maxReconnects  = 8
+	// stallBudget is how long one range may go without a byte before the
+	// download fails. Counting reconnects instead used to give up after
+	// about half a minute, which a hotspot reaches on a bad minute.
+	stallBudget = 2 * time.Minute
 )
 
 const slowRatio = 0.30
@@ -26,6 +29,7 @@ const slowRatio = 0.30
 // segment. All fields read by the health loop are atomic.
 type workerHealth struct {
 	active     atomic.Bool
+	gotData    atomic.Bool // this attempt has delivered at least one byte
 	seg        atomic.Int32
 	bytes      atomic.Int64 // total bytes written by this worker
 	started    atomic.Int64 // unix nanos of the current attempt
@@ -59,6 +63,7 @@ func (h *healthTracker) begin(i, seg int, started time.Time, cancel context.Canc
 	w.cancelMu.Lock()
 	w.cancel = cancel
 	w.cancelMu.Unlock()
+	w.gotData.Store(false)
 	w.seg.Store(int32(seg))
 	w.started.Store(started.UnixNano())
 	w.lastActive.Store(started.UnixNano())
@@ -71,6 +76,7 @@ func (h *healthTracker) add(i int, n int64) {
 		return
 	}
 	w.bytes.Add(n)
+	w.gotData.Store(true)
 	w.lastActive.Store(time.Now().UnixNano())
 }
 
@@ -143,6 +149,13 @@ func (h *healthTracker) check(now time.Time) {
 		if age < healthGrace {
 			continue
 		}
+		if !w.gotData.Load() {
+			// Nothing has arrived on this attempt yet. The header and body
+			// timeouts own it: dropping a connection that is still waiting
+			// for its first byte would punish a server that is merely slow
+			// to start, which a crowded hotspot makes common.
+			continue
+		}
 		last := time.Unix(0, w.lastActive.Load())
 		if now.Sub(last) >= stallAfter {
 			drop = append(drop, slow{i: i})
@@ -154,14 +167,22 @@ func (h *healthTracker) check(now time.Time) {
 	}
 
 	for _, d := range drop {
-		w := h.workers[d.i]
-		w.cancelMu.Lock()
-		cancel := w.cancel
-		// Do not cancel twice: a reconnecting worker clears the slot.
-		w.cancel = nil
-		w.cancelMu.Unlock()
-		if cancel != nil {
-			cancel()
-		}
+		h.cancelAttempt(d.i)
 	}
+}
+
+// cancelAttempt interrupts whatever worker i is streaming now, and reports
+// whether there was anything to interrupt.
+func (h *healthTracker) cancelAttempt(i int) bool {
+	w := h.workers[i]
+	w.cancelMu.Lock()
+	cancel := w.cancel
+	// Do not cancel twice: a reconnecting worker clears the slot.
+	w.cancel = nil
+	w.cancelMu.Unlock()
+	if cancel == nil {
+		return false
+	}
+	cancel()
+	return true
 }

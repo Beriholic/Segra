@@ -23,6 +23,10 @@ var (
 	// pausing: a watchdog cut this connection. It ends the download with
 	// a message, instead of leaving the task "downloading" at zero bytes.
 	errStalled = errors.New("connection stalled: the server stopped sending data")
+	// errUnreachable means the network itself kept failing -- resets,
+	// TLS handshake timeouts, a DNS that never answered -- for the whole
+	// stall budget, so not one byte of the range could get through.
+	errUnreachable = errors.New("cannot reach the server")
 )
 
 const (
@@ -169,17 +173,11 @@ func planSegments(size int64, connections int) []segmentState {
 	if int64(connections) > size {
 		connections = int(size)
 	}
-	// Split big files into more chunks than connections so a slow
-	// connection only holds up its own chunk; idle workers take the next.
+	// One range per connection, the way Surge cuts a file: every worker
+	// takes a slice of its own and the whole file is in flight from the
+	// first byte. Work stealing covers the connection that falls behind,
+	// so the ranges do not need to outnumber the workers.
 	n := connections
-	if size >= 16<<20 {
-		if target := int(size / (2 << 20)); target > n {
-			n = target
-		}
-		if limit := connections * 8; n > limit {
-			n = limit
-		}
-	}
 	segs := make([]segmentState, 0, n)
 	chunk := (size + int64(n) - 1) / int64(n)
 	for start := int64(0); start < size; start += chunk {

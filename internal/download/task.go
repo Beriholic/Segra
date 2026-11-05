@@ -48,6 +48,19 @@ type Task struct {
 
 	// Speed is bytes per second, filled in by the manager while running.
 	Speed int64 `json:"-"`
+
+	// Segments is the live progress of the byte ranges, one per block the
+	// panel draws. The manager rewrites the slice on every tick, so a
+	// snapshot never sees it change under it. The .part metadata, not this
+	// field, is what survives a restart.
+	Segments []SegmentProgress `json:"-"`
+}
+
+// SegmentProgress is how much of one byte range is on disk.
+type SegmentProgress struct {
+	Start int64 `json:"start"`
+	Done  int64 `json:"done"`
+	Total int64 `json:"total"` // -1 when the server gave no length
 }
 
 // Path is the final path of the task's file.
