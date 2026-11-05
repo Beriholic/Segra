@@ -44,11 +44,6 @@ func (a *App) row(c *ui.Context, i int) {
 				a.rowStat(c, t)
 				a.rowAction(c, t)
 			})
-			if pct := progressValue(t); pct >= 0 {
-				ui.Box(c).Absolute().Left(13).Right(13).Bottom(0).Height(2).Radius(1).Background(colLineSoft).Children(func() {
-					ui.Box(c).Height(2).WidthPercent(float32(pct * 100)).Radius(1).Background(progressColor(t))
-				})
-			}
 		})
 	})
 }

@@ -52,18 +52,6 @@ func progressColor(t download.Task) ui.Color {
 	return colGreen
 }
 
-// progressValue is the row progress bar fill (0..1), or -1 when no bar should
-// be drawn. Finished downloads carry no progress information, so they get none.
-func progressValue(t download.Task) float64 {
-	switch t.Status {
-	case download.StatusDownloading, download.StatusPaused, download.StatusFailed:
-		if t.Size > 0 {
-			return t.Percent()
-		}
-	}
-	return -1
-}
-
 func rowMeta(t download.Task) string {
 	switch t.Status {
 	case download.StatusCompleted:
@@ -139,13 +127,6 @@ func hostOf(raw string) string {
 		rest = rest[:i]
 	}
 	return rest
-}
-
-func activeCount(n int, active bool) int {
-	if !active {
-		return 0
-	}
-	return n - n/8
 }
 
 func percentLabel(t download.Task) string {

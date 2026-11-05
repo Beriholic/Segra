@@ -1084,14 +1084,14 @@ func (msgs Messages) SpeedLastMinute() string {
 	return Catalog.Format(msgs.locale, "speedLastMinute", nil)
 }
 
-// ConnectionHealth says "Connection health"
+// ShardProgress says "Shard progress"
 // in the language the app shows.
-func ConnectionHealth() string { return In(i18n.Locale()).ConnectionHealth() }
+func ShardProgress() string { return In(i18n.Locale()).ShardProgress() }
 
-// ConnectionHealth says "Connection health"
+// ShardProgress says "Shard progress"
 // in the language of msgs.
-func (msgs Messages) ConnectionHealth() string {
-	return Catalog.Format(msgs.locale, "connectionHealth", nil)
+func (msgs Messages) ShardProgress() string {
+	return Catalog.Format(msgs.locale, "shardProgress", nil)
 }
 
 // Source says "Source"

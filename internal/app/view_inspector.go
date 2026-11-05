@@ -52,8 +52,8 @@ func (a *App) inspector(c *ui.Context, strip float32) {
 						a.inspectorStats(c, *t)
 						if t.Status == download.StatusDownloading || t.Status == download.StatusPaused {
 							a.inspectorSpark(c)
-							a.inspectorConnections(c, *t)
 						}
+						a.inspectorShards(c, *t)
 						a.inspectorMeta(c, *t)
 						a.inspectorEvents(c, *t)
 					})
@@ -318,29 +318,125 @@ func sparkCurve(path *ui.Path, pts [][2]float32, from, to int, top, floor float3
 	}
 }
 
-func (a *App) inspectorConnections(c *ui.Context, t download.Task) {
-	active := t.Status == download.StatusDownloading
-	n := t.Connections
-	if n <= 0 {
-		n = 1
+// The chunk map: 24 cells of 8 points with a 3 point gap fill the 261 the
+// panel gives, so the grid runs edge to edge. Four rows keep the cells
+// square, the way Surge's TUI chunk map does.
+const (
+	chunkRows = 4
+	chunkCols = 24
+	chunkSize = 8
+	chunkGap  = 3
+)
+
+// blockState is one patch of the file.
+type blockState uint8
+
+const (
+	blockPending blockState = iota // no byte of this patch is on disk
+	blockActive                    // some are, and the rest are on their way
+	blockDone                      // every byte of this patch is on disk
+)
+
+// chunkBlocks paints the file as rows*cols cells in byte order, each cell
+// saying how much of the bytes it covers is on disk. The cells a segment
+// overlaps add up to that share, so a cell is green once every byte it
+// covers has landed, amber while it straddles a segment being written, and
+// empty before that. This is the reading Surge's TUI chunk map gives: one
+// frontier over the whole file instead of one bar per connection.
+//
+// It returns nil when nothing is known yet, so the panel stays out of the way.
+func chunkBlocks(t download.Task) []blockState {
+	if len(t.Segments) == 0 && t.Status != download.StatusCompleted {
+		return nil
 	}
-	if n > 32 {
-		n = 32
+	out := make([]blockState, chunkRows*chunkCols)
+	if t.Status == download.StatusCompleted {
+		// Every byte of a finished download is on disk, whether the ranges
+		// are still around or not.
+		for i := range out {
+			out[i] = blockDone
+		}
+		return out
 	}
+	if len(t.Segments) == 0 || t.Size <= 0 {
+		// No ranges to read, or no length to divide: fall back to the
+		// task's own share and fill the cells in order.
+		return fillBlocks(out, t.Percent())
+	}
+	per := float64(t.Size) / float64(len(out))
+	for i := range out {
+		start := int64(float64(i) * per)
+		end := int64(float64(i+1) * per)
+		if end <= start {
+			continue
+		}
+		var done int64
+		for _, s := range t.Segments {
+			if s.Done <= 0 {
+				continue
+			}
+			lo := max(start, s.Start)
+			hi := min(end, s.Start+s.Done)
+			if hi > lo {
+				done += hi - lo
+			}
+		}
+		switch {
+		case done >= end-start:
+			out[i] = blockDone
+		case done > 0:
+			out[i] = blockActive
+		}
+	}
+	return out
+}
+
+// fillBlocks lights the cells a share p of the way through, for a task whose
+// ranges say nothing.
+func fillBlocks(cells []blockState, p float64) []blockState {
+	filled := p * float64(len(cells))
+	for i := range cells {
+		switch {
+		case float64(i+1) <= filled+1e-9:
+			cells[i] = blockDone
+		case float64(i) < filled:
+			cells[i] = blockActive
+		}
+	}
+	return cells
+}
+
+func blockColor(state blockState, paused bool) ui.Color {
+	switch state {
+	case blockDone:
+		return colGreen
+	case blockActive:
+		if paused {
+			// A paused download writes nothing: the frontier cools off.
+			return colBlockCold
+		}
+		return colBlockHot
+	}
+	return colBlockTrack
+}
+
+func (a *App) inspectorShards(c *ui.Context, t download.Task) {
+	cells := chunkBlocks(t)
+	if len(cells) == 0 {
+		return
+	}
+	paused := t.Status == download.StatusPaused
 	ui.Column(c).Gap(8).Children(func() {
-		ui.Row(c).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, locales.ConnectionHealth()).FontSize(11.5).TextColor(colLabel).Grow(1)
-			ui.Text(c, fmt.Sprintf("%d / %d", activeCount(n, active), n)).FontSize(11).TextColor(colMuted)
-		})
-		ui.Row(c).Gap(2).AlignItems(ui.End).Height(26).Children(func() {
-			for i := 0; i < n; i++ {
-				h := float32(9 + (i*7)%17)
-				color := ui.RGBA(0x1C, 0x1C, 0x1E, 0.16)
-				if active && i%5 != 3 {
-					color = ui.RGBA(0x2F, 0x7D, 0x57, 0.8)
-					h = float32(14 + (i*11)%12)
-				}
-				ui.Box(c).Width(4).Height(h).Radius(1).Background(color)
+		ui.Text(c, locales.ShardProgress()).FontSize(11.5).TextColor(colLabel)
+		ui.Column(c).Gap(chunkGap).Children(func() {
+			for row := 0; row < chunkRows; row++ {
+				line := cells[row*chunkCols : (row+1)*chunkCols]
+				ui.Row(c).Gap(chunkGap).Children(func() {
+					for _, state := range line {
+						ui.Box(c).Width(chunkSize).Height(chunkSize).
+							Radius(1.5).Background(blockColor(state, paused))
+					}
+				})
 			}
 		})
 	})
@@ -358,7 +454,6 @@ func (a *App) inspectorMeta(c *ui.Context, t download.Task) {
 		if t.ETag != "" {
 			row(locales.Checksum(), strings.Trim(t.ETag, `"`))
 		}
-		row(locales.Shards(), fmt.Sprintf("%d", t.Connections))
 	})
 }
 

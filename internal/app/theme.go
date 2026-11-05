@@ -29,6 +29,12 @@ var (
 	colOK        = colGreen
 	colWarn      = ui.RGB(0xA9, 0x6A, 0x12)
 	colDanger    = ui.RGB(0xB4, 0x45, 0x3B)
+
+	// The chunk map: an empty patch, the frontier of bytes being written,
+	// and that frontier once the download pauses.
+	colBlockTrack = ui.RGBA(0x1C, 0x1C, 0x1E, 0.10)
+	colBlockHot   = ui.RGB(0xC0, 0x84, 0x3A)
+	colBlockCold  = ui.RGB(0xD2, 0xAC, 0x72)
 )
 
 // segraTheme keeps the widgets built into mygo — search fields, text inputs,

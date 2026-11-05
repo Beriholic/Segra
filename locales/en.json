@@ -105,7 +105,7 @@
   "collapseDetails": "Collapse details",
   "expandDetails": "Expand details",
   "speedLastMinute": "Speed · last 60 seconds",
-  "connectionHealth": "Connection health",
+  "shardProgress": "Shard progress",
   "source": "Source",
   "checksum": "Checksum",
   "shards": "Shards",

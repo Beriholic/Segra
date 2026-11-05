@@ -105,7 +105,7 @@
   "collapseDetails": "收起详情",
   "expandDetails": "展开详情",
   "speedLastMinute": "速度 · 最近 60 秒",
-  "connectionHealth": "连接健康",
+  "shardProgress": "分片进度",
   "source": "来源",
   "checksum": "校验",
   "shards": "分片",
