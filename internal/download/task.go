@@ -49,6 +49,12 @@ type Task struct {
 	// Speed is bytes per second, filled in by the manager while running.
 	Speed int64 `json:"-"`
 
+	// Interrupted says the task was on its way when the app last quit, and
+	// not paused by the user: only these continue on launch. Load sets it;
+	// resuming the task clears it, and it never reaches tasks.json, where
+	// the status the task had when it ran says it for the next launch.
+	Interrupted bool `json:"-"`
+
 	// Segments is the live progress of the byte ranges, one per block the
 	// panel draws. The manager rewrites the slice on every tick, so a
 	// snapshot never sees it change under it. The .part metadata, not this

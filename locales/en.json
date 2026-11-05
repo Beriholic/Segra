@@ -55,7 +55,7 @@
   "notifications": "Notifications",
   "notificationsHint": "Show a notification when a download finishes or fails.",
   "autoResume": "Resume on launch",
-  "autoResumeHint": "Continue unfinished downloads when Segra starts.",
+  "autoResumeHint": "Resume the downloads that were running when Segra last quit. The ones you paused stay paused.",
   "clipboardFill": "Prefill the link from the clipboard",
   "clipboardFillHint": "Read the link on the clipboard when New Download opens.",
   "openAtLogin": "Open at login",

@@ -95,6 +95,7 @@ func (m *Manager) Resume(id string) {
 	}
 	t.Status = StatusQueued
 	t.Error = ""
+	t.Interrupted = false
 	m.queue = append(m.queue, id)
 	m.mu.Unlock()
 	m.changed()
@@ -135,8 +136,27 @@ func (m *Manager) ResumeAll() {
 		if t.Status == StatusPaused {
 			t.Status = StatusQueued
 			t.Error = ""
+			t.Interrupted = false
 			m.queue = append(m.queue, t.ID)
 		}
+	}
+	m.mu.Unlock()
+	m.changed()
+	m.wake()
+}
+
+// ResumeInterrupted queues the tasks that were on their way when the app last
+// quit, and only those: a task the user paused stays paused across launches.
+func (m *Manager) ResumeInterrupted() {
+	m.mu.Lock()
+	for _, t := range m.tasks {
+		if t.Status != StatusPaused || !t.Interrupted {
+			continue
+		}
+		t.Status = StatusQueued
+		t.Error = ""
+		t.Interrupted = false
+		m.queue = append(m.queue, t.ID)
 	}
 	m.mu.Unlock()
 	m.changed()

@@ -55,7 +55,7 @@
   "notifications": "通知",
   "notificationsHint": "下载完成或失败时显示通知。",
   "autoResume": "启动时继续",
-  "autoResumeHint": "Segra 启动后继续未完成的下载。",
+  "autoResumeHint": "继续上次退出时仍在下载的任务，手动暂停的保持暂停。",
   "clipboardFill": "从剪贴板填入链接",
   "clipboardFillHint": "打开新建下载时，自动读取剪贴板里的链接。",
   "openAtLogin": "登录时打开",

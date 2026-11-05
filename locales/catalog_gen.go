@@ -584,11 +584,11 @@ func (msgs Messages) AutoResume() string {
 	return Catalog.Format(msgs.locale, "autoResume", nil)
 }
 
-// AutoResumeHint says "Continue unfinished downloads when Segra starts."
+// AutoResumeHint says "Resume the downloads that were running when Segra last quit. The ones you paused stay paused."
 // in the language the app shows.
 func AutoResumeHint() string { return In(i18n.Locale()).AutoResumeHint() }
 
-// AutoResumeHint says "Continue unfinished downloads when Segra starts."
+// AutoResumeHint says "Resume the downloads that were running when Segra last quit. The ones you paused stay paused."
 // in the language of msgs.
 func (msgs Messages) AutoResumeHint() string {
 	return Catalog.Format(msgs.locale, "autoResumeHint", nil)

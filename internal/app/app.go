@@ -110,7 +110,9 @@ func (a *App) start() {
 		a.mgr.Load(tasks)
 	}
 	if a.settings.AutoResume {
-		a.mgr.ResumeAll()
+		// Only what the user left running: a task they paused on purpose
+		// waits for them to resume it.
+		a.mgr.ResumeInterrupted()
 	}
 
 	if a.settings.EnableAPI {

@@ -113,7 +113,8 @@ func (m *Manager) Config() Config {
 }
 
 // Load adds tasks read from disk. Tasks that were downloading are marked
-// paused so the user can resume them.
+// paused so the user can resume them, and as interrupted, so that
+// ResumeInterrupted picks them up and leaves the tasks the user paused alone.
 func (m *Manager) Load(tasks []Task) {
 	// Status first, then the metadata read: only a paused or failed task has
 	// a .part file to read block progress from.
@@ -121,6 +122,9 @@ func (m *Manager) Load(tasks []Task) {
 		switch tasks[i].Status {
 		case StatusDownloading, StatusQueued:
 			tasks[i].Status = StatusPaused
+			tasks[i].Interrupted = true
+		default:
+			tasks[i].Interrupted = false
 		}
 		restoreSegments(&tasks[i])
 	}

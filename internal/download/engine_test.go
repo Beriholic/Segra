@@ -363,6 +363,19 @@ func TestDoesNotResumeAnotherTasksPart(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitStatus(t, m, first.ID, StatusDownloading, 5*time.Second)
+	// Pause once bytes are on disk: a task paused before it opened its part
+	// file leaves nothing behind for the second one to collide with.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		task, ok := m.Get(first.ID)
+		if ok && task.Downloaded > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the first task never wrote a byte")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	m.Pause(first.ID)
 	waitStatus(t, m, first.ID, StatusPaused, 5*time.Second)
 
@@ -376,6 +389,42 @@ func TestDoesNotResumeAnotherTasksPart(t *testing.T) {
 	}
 	if got, err := os.ReadFile(done.Path()); err != nil || !bytes.Equal(got, payload) {
 		t.Fatalf("second download corrupt: %v", err)
+	}
+}
+
+// A task the user paused stays paused across launches; only the one that was
+// on its way when the app quit continues.
+func TestPausedTaskStaysPausedOnLaunch(t *testing.T) {
+	payload := bytes.Repeat([]byte("z"), 64*1024)
+	srv := testServer(payload, 0, true)
+	defer srv.Close()
+	dir := t.TempDir()
+
+	// What tasks.json holds after a quit: the task that was running still
+	// says so, the one the user paused says paused.
+	m, _ := testManager(t, dir)
+	m.Load([]Task{
+		{ID: "running", URL: srv.URL + "/running.bin", FileName: "running.bin", Dir: dir, Status: StatusDownloading, Connections: 2},
+		{ID: "paused", URL: srv.URL + "/paused.bin", FileName: "paused.bin", Dir: dir, Status: StatusPaused, Connections: 2},
+	})
+
+	running, _ := m.Get("running")
+	if running.Status != StatusPaused || !running.Interrupted {
+		t.Fatalf("the task that was running loaded as %q, interrupted %v", running.Status, running.Interrupted)
+	}
+	held, _ := m.Get("paused")
+	if held.Status != StatusPaused || held.Interrupted {
+		t.Fatalf("the task the user paused loaded as %q, interrupted %v", held.Status, held.Interrupted)
+	}
+
+	m.ResumeInterrupted()
+
+	done := waitStatus(t, m, "running", StatusCompleted, 10*time.Second)
+	if got, err := os.ReadFile(done.Path()); err != nil || !bytes.Equal(got, payload) {
+		t.Fatalf("the resumed download is corrupt: %v", err)
+	}
+	if got, _ := m.Get("paused"); got.Status != StatusPaused {
+		t.Fatalf("the task the user paused is %q, want paused", got.Status)
 	}
 }
 
