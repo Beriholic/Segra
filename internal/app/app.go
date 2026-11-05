@@ -32,6 +32,7 @@ type App struct {
 	win      *mygo.Window
 	tray     *mygo.Tray
 	quitting bool
+	paused   bool
 
 	tasks    []download.Task
 	rows     []download.Task
@@ -59,8 +60,16 @@ type App struct {
 	langTag         string
 	langPick        string // the label the language picker shows
 
+	// speedSamples is the throughput of the last minute, one sample a
+	// second, written by sampleSpeeds and read by the speed chart.
+	speedMu      sync.Mutex
 	speedSamples []float64
-	lastSample   time.Time
+	sampleStop   chan struct{}
+	// sparkBuf, sparkSmooth and sparkPts hold what the speed chart draws,
+	// reused every frame so that a chart at rest does not allocate.
+	sparkBuf    []float64
+	sparkSmooth []float64
+	sparkPts    [][2]float32
 }
 
 // start opens the store, the download manager and the local API, then the
@@ -126,6 +135,9 @@ func (a *App) start() {
 	}
 	a.refresh()
 
+	a.sampleStop = make(chan struct{})
+	go a.sampleSpeeds(a.sampleStop)
+
 	win := mygo.NewWindow(mygo.WindowOptions{
 		Title:         "Segra",
 		Width:         1180,
@@ -159,6 +171,10 @@ func (a *App) start() {
 // shutdown persists state and stops the background workers.
 func (a *App) shutdown() {
 	a.persist()
+	if a.sampleStop != nil {
+		close(a.sampleStop)
+		a.sampleStop = nil
+	}
 	if a.srv != nil {
 		_ = a.srv.Stop()
 	}
@@ -227,23 +243,76 @@ func (a *App) refresh() {
 	if a.selected < 0 && len(a.rows) > 0 && a.view != "settings" {
 		a.selected = 0
 	}
-	now := time.Now()
-	if a.lastSample.IsZero() || now.Sub(a.lastSample) >= 900*time.Millisecond {
-		var total float64
-		for _, t := range a.tasks {
-			if t.Status == download.StatusDownloading {
-				total += float64(t.Speed)
-			}
-		}
-		a.speedSamples = append(a.speedSamples, total)
-		if len(a.speedSamples) > 60 {
-			a.speedSamples = a.speedSamples[len(a.speedSamples)-60:]
-		}
-		a.lastSample = now
-	}
+	// A pause sends no more progress, so nothing would repaint the window
+	// and the chart would sit frozen with the curve in mid-air.
+	a.settlePause()
 	if mygo.App.IsReady() {
 		mygo.App.SetBadgeCount(a.mgr.ActiveCount())
 	}
+}
+
+// sampleSpeeds records the throughput of the running downloads once a
+// second, whatever the window is doing: the chart of the last minute has to
+// keep its history while the app sits in the background, and it must read
+// zero at once while a download is paused, not where the frame of the pause
+// happened to leave it.
+func (a *App) sampleSpeeds(stop chan struct{}) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			var total float64
+			for _, t := range a.mgr.List() {
+				if t.Status == download.StatusDownloading {
+					total += float64(t.Speed)
+				}
+			}
+			a.speedMu.Lock()
+			a.speedSamples = append(a.speedSamples, total)
+			if len(a.speedSamples) > sparkSlots {
+				a.speedSamples = a.speedSamples[len(a.speedSamples)-sparkSlots:]
+			}
+			a.speedMu.Unlock()
+		}
+	}
+}
+
+// settlePause repaints the window a few times after downloads pause: the
+// manager sends nothing once the bytes stop, so the curve of the speed chart
+// would stay where the last frame left it, halfway down. A handful of frames
+// is enough for it to reach the floor; after that the chart is at rest and
+// the sampler keeps its history up to date for when it shows again.
+func (a *App) settlePause() {
+	paused := false
+	for _, t := range a.tasks {
+		if t.Status == download.StatusPaused {
+			paused = true
+			break
+		}
+	}
+	a.mu.Lock()
+	changed := paused != a.paused
+	a.paused = paused
+	win := a.win
+	a.mu.Unlock()
+	if !changed || !paused || win == nil {
+		return
+	}
+	go func() {
+		for range 8 {
+			time.Sleep(time.Second)
+			a.mu.Lock()
+			quitting := a.quitting
+			a.mu.Unlock()
+			if quitting {
+				return
+			}
+			win.Update(func() { a.refresh() })
+		}
+	}()
 }
 
 func (a *App) matchesView(t download.Task) bool {

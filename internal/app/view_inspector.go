@@ -145,49 +145,177 @@ func (a *App) inspectorStats(c *ui.Context, t download.Task) {
 }
 
 func (a *App) inspectorSpark(c *ui.Context) {
-	peak := 0.0
-	for _, v := range a.speedSamples {
-		if v > peak {
-			peak = v
-		}
-	}
-	if peak < 1 {
-		peak = 1
+	// The peak is what the curve is scaled to, so it says how high the
+	// chart goes; a minute without transfer has no height to name.
+	peak := "—"
+	if p := sparkPeak(a.sparkSeries()); p >= 1 {
+		peak = "↑ " + formatBytes(int64(p)) + "/s"
 	}
 	ui.Column(c).Gap(8).Children(func() {
 		ui.Row(c).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, locales.SpeedLastMinute()).FontSize(11.5).TextColor(colLabel).Grow(1)
-			ui.Text(c, "↑ "+formatBytes(int64(peak))+"/s").FontSize(11).TextColor(colMuted)
+			ui.Text(c, peak).FontSize(11).TextColor(colMuted)
 		})
-		ui.Box(c).Height(40).FillWidth().Draw(func(p *ui.Painter, r ui.Rect) {
-			samples := a.speedSamples
-			if len(samples) < 2 {
-				return
-			}
-			n := len(samples)
-			step := r.W / float32(n-1)
-			barW := step
-			if barW > 4 {
-				barW = 4
-			}
-			if barW < 1 {
-				barW = 1
-			}
-			for i, v := range samples {
-				h := float32(v/peak) * (r.H - 4)
-				if h < 1 {
-					h = 1
-				}
-				x := r.X + float32(i)*step
-				p.Fill(ui.Rect{X: x, Y: r.Y + r.H - h, W: barW, H: h}, ui.RGBA(0x1C, 0x1C, 0x1E, 0.08), 1)
-			}
-			for i := 1; i < n; i++ {
-				y0 := r.Y + r.H - float32(samples[i-1]/peak)*(r.H-4)
-				y1 := r.Y + r.H - float32(samples[i]/peak)*(r.H-4)
-				p.Line(r.X+float32(i-1)*step, y0, r.X+float32(i)*step, y1, 1.4, colGreen)
-			}
+		ui.Box(c).Height(46).FillWidth().Draw(func(p *ui.Painter, r ui.Rect) {
+			a.drawSpark(p, r)
 		})
 	})
+}
+
+// sparkSeries returns the last minute of samples smoothed into a trend: a
+// binomial average over five seconds takes the jitter of single samples out
+// while keeping the shape of a real drop, so the curve drawn from it shows
+// where the throughput is going instead of every hiccup on the way.
+func (a *App) sparkSeries() []float64 {
+	a.speedMu.Lock()
+	if cap(a.sparkBuf) < len(a.speedSamples) {
+		a.sparkBuf = make([]float64, 0, sparkSlots)
+	}
+	src := append(a.sparkBuf[:0], a.speedSamples...)
+	a.sparkBuf = src
+	a.speedMu.Unlock()
+	if len(src) < 3 {
+		return src
+	}
+	if cap(a.sparkSmooth) < len(src) {
+		a.sparkSmooth = make([]float64, len(src))
+	}
+	out := a.sparkSmooth[:len(src)]
+	kernel := [5]float64{1, 4, 6, 4, 1}
+	for i := range src {
+		var sum, weight float64
+		for k, w := range kernel {
+			j := i + k - 2
+			if j < 0 {
+				j = 0
+			}
+			if j >= len(src) {
+				j = len(src) - 1
+			}
+			sum += src[j] * w
+			weight += w
+		}
+		out[i] = sum / weight
+	}
+	return out
+}
+
+func sparkPeak(vals []float64) float64 {
+	peak := 0.0
+	for _, v := range vals {
+		if v > peak {
+			peak = v
+		}
+	}
+	return peak
+}
+
+// sparkSlots is how many seconds the chart shows: one slot per sample of the
+// minute, so that the newest sample stays on the right edge and the curve
+// keeps its scale from the first second of a download instead of stretching
+// over the whole width until the minute is full.
+const sparkSlots = 60
+
+// drawSpark draws the throughput as a smooth area chart: a curve through
+// the samples and the room under it tinted down to the floor. Time without
+// a transfer keeps only the floor, so an idle minute reads as a chart at
+// rest rather than a green line stuck to the bottom.
+func (a *App) drawSpark(p *ui.Painter, r ui.Rect) {
+	vals := a.sparkSeries()
+	if len(vals) < 2 {
+		return
+	}
+	peak := max(sparkPeak(vals), 1)
+	// Leave room for the stroke's round ends and for a spike to sit at the
+	// very top without touching it.
+	plot := ui.Rect{X: r.X + 1, Y: r.Y, W: r.W - 2, H: r.H}
+	floor := plot.Y + plot.H - 1
+	rise := plot.H - 5
+	step := plot.W / float32(sparkSlots-1)
+	lead := float32(sparkSlots-len(vals)) * step
+
+	if cap(a.sparkPts) < len(vals) {
+		a.sparkPts = make([][2]float32, len(vals))
+	}
+	pts := a.sparkPts[:len(vals)]
+	for i, v := range vals {
+		h := float32(v/peak) * rise
+		if h < 0.6 {
+			h = 0 // a stalled second sits on the floor, not above it
+		}
+		pts[i] = [2]float32{plot.X + lead + float32(i)*step, floor - h}
+	}
+	a.sparkPts = pts
+
+	// The room under the curve, deepest where the transfer runs fastest.
+	area := &ui.Path{}
+	area.MoveTo(pts[0][0], floor)
+	area.LineTo(pts[0][0], pts[0][1])
+	sparkCurve(area, pts, 0, len(pts)-1, plot.Y, floor)
+	area.LineTo(pts[len(pts)-1][0], floor)
+	area.Close()
+	p.FillPathGradient(area, ui.LinearGradient{
+		From:  ui.RGBA(0x2F, 0x7D, 0x57, 0.20),
+		To:    ui.RGBA(0x2F, 0x7D, 0x57, 0.00),
+		Angle: 180,
+	})
+
+	// The floor the curve stands on, and the curve itself over the stretches
+	// that carried bytes: a pause or a stall leaves the floor alone instead
+	// of dragging the green line along it.
+	p.Fill(ui.Rect{X: plot.X, Y: floor, W: plot.W, H: 1}, colLine, 0)
+	active := func(i int) bool { return pts[i][1] < floor-0.5 }
+	for i := 0; i < len(pts); {
+		if !active(i) {
+			i++
+			continue
+		}
+		from := i
+		for i < len(pts) && active(i) {
+			i++
+		}
+		// Reach back to the floor on both sides, so the curve rises out of
+		// it and settles back onto it.
+		start, end := max(from-1, 0), min(i, len(pts)-1)
+		curve := &ui.Path{}
+		curve.MoveTo(pts[start][0], pts[start][1])
+		sparkCurve(curve, pts, start, end, plot.Y, floor)
+		p.StrokePath(curve, 1.6, colGreen)
+	}
+}
+
+// sparkCurve appends a curve through pts[from..to], whose current point is
+// pts[from], to path: the Catmull-Rom spline through the samples, as cubic
+// Bézier segments. Control points are held between top and floor, so that a
+// spike pulls the curve to the edge it belongs to and never past it.
+func sparkCurve(path *ui.Path, pts [][2]float32, from, to int, top, floor float32) {
+	n := len(pts)
+	at := func(i int) [2]float32 {
+		if i < 0 {
+			return pts[0]
+		}
+		if i >= n {
+			return pts[n-1]
+		}
+		return pts[i]
+	}
+	clamp := func(v float32) float32 {
+		if v < top {
+			return top
+		}
+		if v > floor {
+			return floor
+		}
+		return v
+	}
+	for i := from; i < to; i++ {
+		prev, here, next, after := at(i-1), pts[i], pts[i+1], at(i+2)
+		path.CubeTo(
+			here[0]+(next[0]-prev[0])/6, clamp(here[1]+(next[1]-prev[1])/6),
+			next[0]-(after[0]-here[0])/6, clamp(next[1]-(after[1]-here[1])/6),
+			next[0], next[1],
+		)
+	}
 }
 
 func (a *App) inspectorConnections(c *ui.Context, t download.Task) {
