@@ -50,6 +50,11 @@ func segraTheme() *ui.Theme {
 	t.Text = colText
 	t.TextMuted = colMuted
 	t.Accent = colGreen
+	// The app draws most of its green by hand, in a colour no window state
+	// changes, so the widgets that take the accent from the theme keep it too:
+	// a window of quiet paper should not grow a patch of grey when it loses
+	// the keyboard.
+	t.InactiveAccent = colGreen
 	t.AccentHover = colGreenDeep
 	t.AccentPressed = colGreenDeep
 	t.AccentText = ui.RGB(0xFF, 0xFF, 0xFF)

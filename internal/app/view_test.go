@@ -46,7 +46,6 @@ func newTestApp(t *testing.T) *App {
 			}
 			return ""
 		},
-		Selected: &a.selected,
 	}
 	return a
 }
