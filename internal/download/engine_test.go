@@ -278,6 +278,39 @@ func TestFilenameFromDisposition(t *testing.T) {
 	}
 }
 
+// TestFilenameAfterRedirect is the shape a GitHub release download takes:
+// the first URL redirects to a signed path, and the name arrives with the
+// headers of the redirect. A name guessed from the first URL would call the
+// file after the signature.
+func TestFilenameAfterRedirect(t *testing.T) {
+	payload := []byte("hello")
+	mux := http.NewServeMux()
+	mux.HandleFunc("/releases/download/v1/app.dmg", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/objects/b674b4e8-15da-4d0e-a795-7256df96b014", http.StatusFound)
+	})
+	mux.HandleFunc("/objects/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Disposition", `attachment; filename="app-1.0.dmg"`)
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		_, _ = w.Write(payload)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	dir := t.TempDir()
+	m, _ := testManager(t, dir)
+
+	task, err := m.Create(CreateRequest{URL: srv.URL + "/releases/download/v1/app.dmg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitStatus(t, m, task.ID, StatusCompleted, 10*time.Second)
+	if done.FileName != "app-1.0.dmg" {
+		t.Fatalf("filename = %q", done.FileName)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "app-1.0.dmg")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestUniqueNames(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "a.zip"), []byte("x"), 0o600); err != nil {

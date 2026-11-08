@@ -168,7 +168,6 @@ func (a *App) applySettings(c *ui.Context) {
 	s.Normalize()
 
 	portChanged := s.APIPort != a.settings.APIPort
-	loginChanged := s.OpenAtLogin != a.settings.OpenAtLogin
 	a.settings = s
 	a.syncFields()
 
@@ -180,10 +179,15 @@ func (a *App) applySettings(c *ui.Context) {
 		Connections:   s.Connections,
 		MaxConcurrent: s.MaxConcurrent,
 	})
-	if loginChanged {
+	// The switch writes a.settings as it is flipped, so there is no old
+	// value left to compare with: what the system was told last is the
+	// only thing that says whether it needs telling again.
+	if s.OpenAtLogin != a.loginSaved {
 		if err := mygo.App.SetOpenAtLogin(s.OpenAtLogin); err != nil {
 			log.Printf("open at login: %v", err)
 			c.Toast(err.Error())
+		} else {
+			a.loginSaved = s.OpenAtLogin
 		}
 	}
 	// The switches write a.settings as they are flipped, so compare with the

@@ -49,6 +49,10 @@ type App struct {
 	// toast is a message a worker left for the next frame to show, as the
 	// outcome of a dialog that ran off the main thread.
 	toast string
+	// loginSaved is what the system was last told about starting at login.
+	// The switch writes a.settings as it flips, so nothing else remembers
+	// the value the system has.
+	loginSaved bool
 
 	// seenAt is when each download first showed, so that its row slides in
 	// once rather than every time the list scrolls it back into view.
@@ -117,6 +121,18 @@ type App struct {
 func (a *App) start() {
 	if a.settings.Language != "" {
 		mygo.App.SetLocale(a.settings.Language)
+	}
+
+	// The login item belongs to the system, not to the settings file: it
+	// outlives the app, and the user can remove it in System Settings. The
+	// setting is applied again on every launch, so one made before this
+	// build, or removed elsewhere, is made again.
+	if a.settings.OpenAtLogin {
+		if err := mygo.App.SetOpenAtLogin(true); err != nil {
+			// Let the next save of the settings try again.
+			a.loginSaved = false
+			log.Printf("open at login: %v", err)
+		}
 	}
 
 	transport := netproxy.Transport()

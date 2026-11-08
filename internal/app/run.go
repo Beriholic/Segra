@@ -59,6 +59,7 @@ func Run(tray []byte) {
 		}
 	}
 	a.settings = settings
+	a.loginSaved = settings.OpenAtLogin
 	a.syncFields()
 
 	mygo.App.OnSecondInstance(func(args []string, workingDir string) { a.showWindow() })

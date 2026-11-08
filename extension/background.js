@@ -72,11 +72,9 @@ async function api(path, init = {}) {
   return data;
 }
 
-async function submitTask({ url, referer, filename, dir, cookie }) {
+async function submitTask({ url, referer, cookie }) {
   const body = { url };
   if (referer) body.referer = referer;
-  if (filename) body.fileName = filename;
-  if (dir) body.dir = dir;
   if (cookie) body.cookie = cookie;
   body.userAgent = navigator.userAgent;
   return api("/api/tasks", { method: "POST", body: JSON.stringify(body) });
@@ -124,13 +122,6 @@ function hostOf(rawURL) {
   }
 }
 
-// baseName is the last part of a path, as the browser's own download list
-// spells the file it is saving.
-function baseName(path) {
-  const parts = String(path || "").split(/[\\/]/);
-  return parts[parts.length - 1] || "";
-}
-
 // cookiesFor is the header the browser would send with url, so that a file
 // behind a login survives the trip through the app. Chrome answers with the
 // cookies of the sites the extension may read, and nothing for the rest.
@@ -175,18 +166,19 @@ async function interceptDownload(item) {
   // with the extension switched off.
   if (!(await findServer(port))) return;
 
-  const filename = baseName(item.filename) || guessName(url);
+  // No file name: the browser only knows the one it guessed from the URL
+  // before the response arrived, which for a redirect is a signed path or
+  // an id. Segra reads the real one from Content-Disposition.
   try {
     await submitTask({
       url,
       referer: item.referrer || "",
-      filename,
-      cookie: await cookiesFor(url)
+      cookie: await cookiesFor(url),
     });
   } catch (error) {
     // Segra said no, so the browser takes the download back rather than
     // lose it: this one is started by the extension, and skipped above.
-    chrome.downloads.download({ url, filename: filename || undefined }).catch(() => {});
+    chrome.downloads.download({ url }).catch(() => {});
     await notify(t("notifFailed"), explain(error));
     return;
   }
@@ -218,7 +210,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const task = await submitTask({
       url,
       referer: info.pageUrl || (tab && tab.url),
-      filename: guessName(url),
     });
     const name = (task && task.fileName) || guessName(url) || hostOf(url);
     await notify(t("notifSent"), name);
