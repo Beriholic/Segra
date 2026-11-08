@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -100,7 +101,16 @@ func (a *App) settingsView(c *ui.Context) {
 				a.switchRow(c, locales.AutoResume(), locales.AutoResumeHint(), &a.settings.AutoResume)
 				a.switchRow(c, locales.ClipboardFill(), locales.ClipboardFillHint(), &a.settings.ClipboardFill)
 				a.switchRow(c, locales.OpenAtLogin(), "", &a.settings.OpenAtLogin)
-				a.switchRow(c, locales.CloseToTray(), locales.CloseToTrayHint(), &a.settings.CloseToTray)
+				// macOS keeps a menu bar app running when its window closes, so
+				// there the only choice is whether the Dock icon goes with the
+				// window. Elsewhere closing the window would end the app, and
+				// that is worth asking about.
+				if runtime.GOOS != "darwin" {
+					a.switchRow(c, locales.CloseToTray(), locales.CloseToTrayHint(), &a.settings.CloseToTray)
+				}
+				if runtime.GOOS == "darwin" {
+					a.switchRow(c, locales.HideDock(), locales.HideDockHint(), &a.settings.HideDock)
+				}
 			})
 
 			ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {

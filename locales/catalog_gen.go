@@ -644,6 +644,26 @@ func (msgs Messages) CloseToTrayHint() string {
 	return Catalog.Format(msgs.locale, "closeToTrayHint", nil)
 }
 
+// HideDock says "Hide the Dock icon"
+// in the language the app shows.
+func HideDock() string { return In(i18n.Locale()).HideDock() }
+
+// HideDock says "Hide the Dock icon"
+// in the language of msgs.
+func (msgs Messages) HideDock() string {
+	return Catalog.Format(msgs.locale, "hideDock", nil)
+}
+
+// HideDockHint says "Segra leaves the Dock once its window is closed. The menu bar icon stays."
+// in the language the app shows.
+func HideDockHint() string { return In(i18n.Locale()).HideDockHint() }
+
+// HideDockHint says "Segra leaves the Dock once its window is closed. The menu bar icon stays."
+// in the language of msgs.
+func (msgs Messages) HideDockHint() string {
+	return Catalog.Format(msgs.locale, "hideDockHint", nil)
+}
+
 // Save says "Save"
 // in the language the app shows.
 func Save() string { return In(i18n.Locale()).Save() }

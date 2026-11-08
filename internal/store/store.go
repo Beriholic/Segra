@@ -29,6 +29,7 @@ type Settings struct {
 	ClipboardFill bool   `json:"clipboardFill"`
 	OpenAtLogin   bool   `json:"openAtLogin"`
 	CloseToTray   bool   `json:"closeToTray"`
+	HideDock      bool   `json:"hideDock"` // macOS: no Dock icon once the window closes
 }
 
 // DefaultSettings returns settings for a first run.
@@ -46,6 +47,7 @@ func DefaultSettings(downloadDir string) Settings {
 		ClipboardFill: false,
 		OpenAtLogin:   false,
 		CloseToTray:   false,
+		HideDock:      false,
 	}
 }
 

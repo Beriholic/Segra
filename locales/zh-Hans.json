@@ -61,6 +61,8 @@
   "openAtLogin": "登录时打开",
   "closeToTray": "关闭窗口后继续运行",
   "closeToTrayHint": "Segra 会留在菜单栏并继续下载。",
+  "hideDock": "隐藏程序坞图标",
+  "hideDockHint": "关闭主窗口后，程序坞里不再显示 Segra。菜单栏图标仍在。",
   "save": "保存",
   "saved": "设置已保存",
   "apiRunning": "本地 API",

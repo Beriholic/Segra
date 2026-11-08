@@ -2,6 +2,7 @@ package app
 
 import (
 	"net/http"
+	"runtime"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -111,5 +112,24 @@ func TestClipboardLink(t *testing.T) {
 		if got := clipboardLink(in); got != want {
 			t.Errorf("clipboardLink(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestSettingsOnMacOfferOnlyTheDockChoice(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("only macOS has a Dock")
+	}
+	a := newTestApp(t)
+	a.view = "settings"
+	a.settings.CloseToTray = false
+	tt := ui.NewTester(a.viewFn, 920, 1200)
+
+	if !tt.HasText(locales.HideDock()) {
+		t.Fatalf("texts %q do not offer the Dock setting", tt.Texts())
+	}
+	// A menu bar app keeps running when its window closes, so offering to
+	// keep running would ask a question with one answer.
+	if tt.HasText(locales.CloseToTray()) {
+		t.Fatalf("texts %q offer the setting that macOS answers itself", tt.Texts())
 	}
 }

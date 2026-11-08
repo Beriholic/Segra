@@ -3,6 +3,7 @@ package app
 import (
 	"log"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -191,9 +192,17 @@ func (a *App) start() {
 	a.mu.Unlock()
 
 	win.OnClose(func(e *mygo.CloseEvent) {
-		if a.settings.CloseToTray && !a.quitting {
+		if a.quitting {
+			return
+		}
+		// Closing the window leaves Segra running in the menu bar. macOS does
+		// that for every app of its kind, so the choice of the Dock icon is
+		// the only one left; elsewhere the window would close for good unless
+		// the user asked for the tray.
+		if runtime.GOOS == "darwin" || a.settings.CloseToTray {
 			e.PreventDefault()
 			win.Hide()
+			a.syncDock()
 		}
 	})
 
@@ -479,6 +488,9 @@ func (a *App) showWindow() {
 	if win == nil {
 		return
 	}
+	// The Dock icon comes back before the window does, so that the window
+	// opens as one of a regular app, in front and with its menu bar.
+	a.setDockHidden(false)
 	win.Show()
 	win.Focus()
 }

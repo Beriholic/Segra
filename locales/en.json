@@ -61,6 +61,8 @@
   "openAtLogin": "Open at login",
   "closeToTray": "Keep running when the window closes",
   "closeToTrayHint": "Segra stays in the menu bar and keeps downloading.",
+  "hideDock": "Hide the Dock icon",
+  "hideDockHint": "Segra leaves the Dock once its window is closed. The menu bar icon stays.",
   "save": "Save",
   "saved": "Settings saved",
   "apiRunning": "Local API",
