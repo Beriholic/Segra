@@ -70,11 +70,14 @@ git push origin v0.2.0
 | --- | --- |
 | macOS（universal） | `segra-<version>.dmg` |
 | Windows（amd64） | `segra-setup-<version>-amd64.exe`（NSIS 安装包） |
-| Linux（amd64） | `segra_<version>_amd64.deb`、`segra-<version>-linux-amd64.tar.gz`、`PKGBUILD` |
+| Linux（amd64） | `segra_<version>_amd64.deb`、`segra-<version>-linux-amd64.tar.gz` |
 
 版本号取自 tag：CI 先把 tag 写进 `mygo.json` 再构建，所以仓库里的 `version`
 不用跟着手动改。macOS 只做 ad-hoc 签名、不做公证，别人第一次打开要在 Finder 里
 右键 → 打开，或者 `xattr -d com.apple.quarantine /Applications/Segra.app`。
+
+Arch 包不单独发布：本地 `go tool mygo build -platform linux/amd64` 会在压缩包旁边写一份
+`PKGBUILD`，在那个目录里 `makepkg -si` 就能打包安装。
 
 ## 安装浏览器扩展
 

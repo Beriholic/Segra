@@ -83,12 +83,15 @@ git push origin v0.2.0
 | --- | --- |
 | macOS (universal) | `segra-<version>.dmg` |
 | Windows (amd64) | `segra-setup-<version>-amd64.exe` (NSIS installer) |
-| Linux (amd64) | `segra_<version>_amd64.deb`, `segra-<version>-linux-amd64.tar.gz`, `PKGBUILD` |
+| Linux (amd64) | `segra_<version>_amd64.deb`, `segra-<version>-linux-amd64.tar.gz` |
 
 The version comes from the tag: the workflow writes it into `mygo.json` before building, so the
 `version` in the repository does not have to be bumped by hand. macOS is signed ad hoc and not
 notarized, so a first launch there needs Open from the context menu, or
 `xattr -d com.apple.quarantine /Applications/Segra.app`.
+
+An Arch package is not published: a local `go tool mygo build -platform linux/amd64` writes a
+`PKGBUILD` beside the archive, and `makepkg -si` in that directory builds and installs it.
 
 ## Installing the browser extension
 
