@@ -88,8 +88,11 @@ type App struct {
 	connsField      float64
 	concurrentField float64
 	portField       float64
-	langTag         string
-	langPick        string // the label the language picker shows
+	// fieldDirty holds a folder typed into the settings that has not become
+	// a setting yet: it saves once the field is left, not on every letter.
+	fieldDirty bool
+	langTag    string
+	langPick   string // the label the language picker shows
 
 	// speedSamples is the throughput of the last minute, one sample a
 	// second, written by sampleSpeeds and read by the speed chart.
@@ -262,6 +265,9 @@ func (a *App) persist() {
 	if a.mgr == nil {
 		return
 	}
+	// Whatever the settings view holds is what the user sees, even when
+	// the window closes with the caret still in a field.
+	a.settings = a.captureSettings()
 	if err := a.store.SaveSettings(a.settings); err != nil {
 		log.Printf("save settings: %v", err)
 	}

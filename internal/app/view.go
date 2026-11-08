@@ -14,6 +14,11 @@ import (
 func (a *App) viewFn(c *ui.Context) {
 	a.refresh()
 	c.SetTheme(segraTheme())
+	// A folder typed into the settings is done with when its view is left,
+	// or the field would go away before anything saved it.
+	if a.view != "settings" {
+		a.commitField()
+	}
 	// A worker that saved something says so here, where a toast has the
 	// frame's own clock to count its seconds from.
 	if message := a.takeToast(); message != "" {

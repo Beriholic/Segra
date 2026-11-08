@@ -664,16 +664,6 @@ func (msgs Messages) HideDockHint() string {
 	return Catalog.Format(msgs.locale, "hideDockHint", nil)
 }
 
-// Save says "Save"
-// in the language the app shows.
-func Save() string { return In(i18n.Locale()).Save() }
-
-// Save says "Save"
-// in the language of msgs.
-func (msgs Messages) Save() string {
-	return Catalog.Format(msgs.locale, "save", nil)
-}
-
 // Saved says "Settings saved"
 // in the language the app shows.
 func Saved() string { return In(i18n.Locale()).Saved() }
@@ -682,6 +672,16 @@ func Saved() string { return In(i18n.Locale()).Saved() }
 // in the language of msgs.
 func (msgs Messages) Saved() string {
 	return Catalog.Format(msgs.locale, "saved", nil)
+}
+
+// AutoSave says "Changes are saved automatically"
+// in the language the app shows.
+func AutoSave() string { return In(i18n.Locale()).AutoSave() }
+
+// AutoSave says "Changes are saved automatically"
+// in the language of msgs.
+func (msgs Messages) AutoSave() string {
+	return Catalog.Format(msgs.locale, "autoSave", nil)
 }
 
 // ApiRunning says "Local API"

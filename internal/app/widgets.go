@@ -91,7 +91,10 @@ func (a *App) switchRow(c *ui.Context, label, hint string, value *bool) {
 				ui.Text(c, hint).FontSize(11).TextColor(colFaint)
 			}
 		})
-		ui.Switch(c, value)
+		// A switch is the whole setting, so it saves as it flips.
+		if ui.Switch(c, value).Changed() {
+			a.applySettings()
+		}
 	})
 }
 

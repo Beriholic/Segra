@@ -28,8 +28,17 @@ func (a *App) settingsView(c *ui.Context) {
 
 			card(locales.DownloadFolder(), func() {
 				ui.Row(c).FillWidth().Gap(8).Children(func() {
-					ui.TextInput(c, &a.dirField).Grow(1).Height(32).Background(ui.RGB(0xFF, 0xFF, 0xFF)).Border(1, colLine).Radius(8)
+					in := ui.TextInput(c, &a.dirField).Grow(1).Height(32).Background(ui.RGB(0xFF, 0xFF, 0xFF)).Border(1, colLine).Radius(8)
 					a.secondaryButton(c, locales.Browse(), func() { go a.browseSettingsDir() })
+					// A folder saves once it is the one the user means: a
+					// path half typed is not a setting, and no download
+					// should land in it.
+					if in.Changed() {
+						a.fieldDirty = true
+					}
+					if a.fieldDirty && (!in.Focused() || in.Submitted()) {
+						a.commitField()
+					}
 				})
 			})
 
@@ -37,12 +46,16 @@ func (a *App) settingsView(c *ui.Context) {
 				ui.Row(c).Gap(32).Children(func() {
 					ui.Column(c).Gap(6).Children(func() {
 						ui.Text(c, locales.Connections()).FontSize(12).TextColor(colMuted)
-						ui.NumberInput(c, &a.connsField, 1, 64, 1)
+						if ui.NumberInput(c, &a.connsField, 1, 64, 1).Changed() {
+							a.applySettings()
+						}
 						ui.Text(c, locales.ConnectionsHint()).FontSize(11).TextColor(colFaint).MaxWidth(230)
 					})
 					ui.Column(c).Gap(6).Children(func() {
 						ui.Text(c, locales.MaxConcurrent()).FontSize(12).TextColor(colMuted)
-						ui.NumberInput(c, &a.concurrentField, 1, 8, 1)
+						if ui.NumberInput(c, &a.concurrentField, 1, 8, 1).Changed() {
+							a.applySettings()
+						}
 						ui.Text(c, locales.MaxConcurrentHint()).FontSize(11).TextColor(colFaint).MaxWidth(210)
 					})
 				})
@@ -53,7 +66,9 @@ func (a *App) settingsView(c *ui.Context) {
 				on := a.settings.EnableAPI
 				body := ui.Column(c).Gap(12).Children(func() {
 					ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
-						ui.NumberInput(c, &a.portField, 1024, 65535, 1)
+						if ui.NumberInput(c, &a.portField, 1024, 65535, 1).Changed() {
+							a.applySettings()
+						}
 						label, color := locales.ApiOff(), colMuted
 						switch {
 						case on && a.apiErr != "":
@@ -128,7 +143,10 @@ func (a *App) settingsView(c *ui.Context) {
 			})
 
 			ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
-				a.primaryButton(c, locales.Save(), func() { a.applySettings(c) })
+				// There is no Save button: every control writes its setting
+				// down as it changes, and the line says so where the button
+				// used to be.
+				ui.Text(c, locales.AutoSave()).FontSize(11.5).TextColor(colFaint).SingleLine()
 				ui.Spacer(c)
 				ui.Text(c, fmt.Sprintf("%s %s", locales.Version(), mygo.App.Version())).FontSize(11).TextColor(colFaint)
 			})

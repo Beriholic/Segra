@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/ui"
 
 	"github.com/beriholic/segra/internal/download"
+	"github.com/beriholic/segra/internal/store"
 	"github.com/beriholic/segra/locales"
 )
 
@@ -101,7 +101,11 @@ func (a *App) browseSettingsDir() {
 	win := a.win
 	a.mu.Unlock()
 	if win != nil {
-		win.Update(func() { a.dirField = dir })
+		win.Update(func() {
+			a.dirField = dir
+			a.fieldDirty = false
+			a.applySettings()
+		})
 	}
 }
 
@@ -154,38 +158,34 @@ func (a *App) setLanguage(tag string) {
 	a.buildMenu()
 }
 
-func (a *App) applySettings(c *ui.Context) {
-	s := a.settings
-	s.DownloadDir = filepath.Clean(strings.TrimSpace(a.dirField))
-	if s.DownloadDir == "" || s.DownloadDir == "." {
-		if downloads, err := mygo.App.Path(mygo.PathDownloads); err == nil {
-			s.DownloadDir = downloads
-		}
-	}
-	s.Connections = int(a.connsField)
-	s.MaxConcurrent = int(a.concurrentField)
-	s.APIPort = int(a.portField)
-	s.Normalize()
-
+// applySettings makes the app run on what the settings view holds, and
+// writes it down: there is no Save button, so every control calls this as
+// it changes. A folder that is only half typed is skipped by the view, and
+// a switch flips a setting whole.
+func (a *App) applySettings() {
+	s := a.captureSettings()
 	portChanged := s.APIPort != a.settings.APIPort
 	a.settings = s
+	a.fieldDirty = false
 	a.syncFields()
 
 	if err := a.store.SaveSettings(s); err != nil {
 		log.Printf("save settings: %v", err)
 	}
-	a.mgr.SetConfig(download.Config{
-		Dir:           s.DownloadDir,
-		Connections:   s.Connections,
-		MaxConcurrent: s.MaxConcurrent,
-	})
+	if a.mgr != nil {
+		a.mgr.SetConfig(download.Config{
+			Dir:           s.DownloadDir,
+			Connections:   s.Connections,
+			MaxConcurrent: s.MaxConcurrent,
+		})
+	}
 	// The switch writes a.settings as it is flipped, so there is no old
 	// value left to compare with: what the system was told last is the
 	// only thing that says whether it needs telling again.
 	if s.OpenAtLogin != a.loginSaved {
 		if err := mygo.App.SetOpenAtLogin(s.OpenAtLogin); err != nil {
 			log.Printf("open at login: %v", err)
-			c.Toast(err.Error())
+			a.say(err.Error())
 		} else {
 			a.loginSaved = s.OpenAtLogin
 		}
@@ -199,15 +199,44 @@ func (a *App) applySettings(c *ui.Context) {
 	case s.EnableAPI && (!running || portChanged):
 		a.restartAPI()
 		if a.apiErr != "" {
-			c.Toast(a.apiErr)
+			a.say(a.apiErr)
 			return
 		}
 		if running && portChanged {
-			c.Toast(locales.PortChanged())
+			a.say(locales.PortChanged())
 			return
 		}
 	}
-	c.Toast(locales.Saved())
+	a.say(locales.Saved())
+}
+
+// commitField saves the folder typed into the settings once its field is
+// done with: until then its letters are not a folder a download could land
+// in, and a path half typed is worse than the one before it.
+func (a *App) commitField() {
+	if !a.fieldDirty {
+		return
+	}
+	a.fieldDirty = false
+	a.applySettings()
+}
+
+// captureSettings folds the settings view's fields into the settings the
+// app runs on, so that a folder typed into a field and one picked in a
+// dialog both become the same setting.
+func (a *App) captureSettings() store.Settings {
+	s := a.settings
+	s.DownloadDir = filepath.Clean(strings.TrimSpace(a.dirField))
+	if s.DownloadDir == "" || s.DownloadDir == "." {
+		if downloads, err := mygo.App.Path(mygo.PathDownloads); err == nil {
+			s.DownloadDir = downloads
+		}
+	}
+	s.Connections = int(a.connsField)
+	s.MaxConcurrent = int(a.concurrentField)
+	s.APIPort = int(a.portField)
+	s.Normalize()
+	return s
 }
 
 func (a *App) syncFields() {
