@@ -11,33 +11,62 @@ import (
 func (a *App) row(c *ui.Context, i int) {
 	t := a.rows[i]
 	selected := i == a.selected
-	ui.Box(c).Height(79).Padding(0, 0, 13, 0).Children(func() {
+
+	// A row slides in when its download first shows, and the rows around it
+	// follow with the same spring when the list reflows. A row that leaves
+	// goes at once: the list is virtualized, so an exit copy would also fly
+	// away at the edge every time a row scrolled out of view.
+	tr := ui.ElementTransition{Animation: &springSoft}
+	if a.fresh(t.ID, freshFor) {
+		tr.Enter = fadeIn(14)
+	}
+	ui.Box(c).Key(t.ID).Height(79).Padding(0, 0, 13, 0).Transition(tr).Children(func() {
 		card := ui.Box(c).Height(65).Radius(10).FillWidth().
 			Background(colCard).Border(1, colLine).
 			Shadow(0, 1, 2, 0, ui.RGBA(28, 28, 30, 0.04)).
 			FocusRing(false)
-		if card.Hovered() {
+		switch {
+		case card.Hovered():
 			card = card.Background(ui.RGB(0xFF, 0xFF, 0xFF)).Shadow(0, 2, 6, 0, ui.RGBA(28, 28, 30, 0.06))
+		case selected:
+			card = card.Background(colCardSel)
 		}
 		if selected {
 			card = card.Shadow(0, 2, 8, 0, ui.RGBA(28, 28, 30, 0.08))
 		}
+		// The card's colours fade as the pointer comes and goes, and it
+		// lifts by a point: a pose, so the hover costs no rebuild.
+		card.Transition(hoverColors)
+		lift := ui.Pose{}
+		if card.Hovered() {
+			lift = ui.Pose{Y: -1, Scale: 1.004}
+		}
+		card.AnimatePose(lift, springSnap)
+		card.Draw(func(p *ui.Painter, r ui.Rect) { a.drawLanded(p, r, t.ID) })
 		card.ContextMenu(func(m *ui.Menu) { a.rowMenu(m, t) })
 		card.OnClick(func() { a.selected = i })
 		if card.DoubleClicked() {
 			a.openTask(t)
 		}
 		card.Children(func() {
+			// The mark of the chosen row stays in the tree, so that it fades
+			// in and out instead of blinking.
+			mark := float32(0)
 			if selected {
-				ui.Box(c).Absolute().Left(-1).Top(9).Bottom(9).Width(4).Radius(2).Background(colGreen)
+				mark = 1
 			}
+			ui.Box(c).Absolute().Left(-1).Top(9).Bottom(9).Width(4).Radius(2).
+				Background(colGreen).
+				AnimatePose(ui.Pose{Fade: 1 - mark}, fadeCurve)
 			ui.Row(c).FillHeight().Padding(9, 12, 9, 13).Gap(12).AlignItems(ui.Center).Children(func() {
 				a.fileTile(c, t.FileName, 34)
 				ui.Column(c).Gap(3).Grow(1).Children(func() {
 					ui.Text(c, t.FileName).FontSize(14).Bold().SingleLine().Ellipsis("…").TextColor(colText)
 					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-						ui.Box(c).Size(5, 5).Radius(3).Background(statusColor(t))
-						ui.Text(c, statusLabel(t)).FontSize(11.5).TextColor(statusColor(t)).SingleLine()
+						ui.Box(c).Size(5, 5).Radius(3).Background(statusColor(t)).
+							Transition(ui.ElementTransition{Colors: true, Duration: motionBase})
+						ui.Text(c, statusLabel(t)).FontSize(11.5).TextColor(statusColor(t)).SingleLine().
+							ContentTransition(ui.ContentTransition{})
 						ui.Text(c, rowMeta(t)).FontSize(11.5).TextColor(colMuted).SingleLine().Ellipsis("…").Grow(1)
 					})
 				})
@@ -46,6 +75,18 @@ func (a *App) row(c *ui.Context, i int) {
 			})
 		})
 	})
+}
+
+// drawLanded rings a row whose download has just landed, the ring fading
+// over the moment: the one flourish the list allows itself, and a frame that
+// only paints.
+func (a *App) drawLanded(p *ui.Painter, r ui.Rect, id string) {
+	f := a.flash(id)
+	if f <= 0 {
+		return
+	}
+	p.Stroke(ui.Rect{X: r.X + 0.5, Y: r.Y + 0.5, W: r.W - 1, H: r.H - 1}, colGreen.Alpha(0.45*f), 10, 1.5)
+	p.AnimationFrame()
 }
 
 func (a *App) fileTile(c *ui.Context, name string, size float32) {
@@ -96,6 +137,8 @@ func (a *App) rowAction(c *ui.Context, t download.Task) {
 	if btn.Hovered() {
 		btn = btn.Background(ui.RGBA(28, 28, 30, 0.06))
 	}
+	btn.Transition(hoverColors)
+	btn.AnimatePose(pressPose(btn), springSnap)
 	btn.Tooltip(tip).OnClick(fn).Children(func() {
 		ui.Icon(c, icon).FontSize(15).TextColor(colMuted)
 	})

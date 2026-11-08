@@ -10,6 +10,7 @@ var (
 	colBG        = ui.RGB(0xF8, 0xF7, 0xF3) // the page the cards sit on
 	colSide      = ui.RGB(0xF0, 0xEF, 0xEA) // sidebar and the strip above the header
 	colCard      = ui.RGB(0xFD, 0xFC, 0xFA) // download rows
+	colCardSel   = ui.RGB(0xFB, 0xFD, 0xF9) // the chosen row, a breath of green
 	colSurface   = ui.RGB(0xFB, 0xFA, 0xF6) // inspector panel
 	colText      = ui.RGB(0x1C, 0x1C, 0x1E)
 	colSub       = ui.RGB(0x3B, 0x3B, 0x3D)

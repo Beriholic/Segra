@@ -36,6 +36,7 @@ func (a *App) openNew() {
 		}
 	}
 	a.newOpen = true
+	a.newRun++
 	a.newLink = ""
 	if a.settings.ClipboardFill {
 		a.newLink = clipboardLink(mygo.Clipboard.ReadText())

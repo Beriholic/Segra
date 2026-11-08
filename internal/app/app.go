@@ -42,6 +42,20 @@ type App struct {
 	// second the downloads do not change says nothing to the system.
 	trayTitle string
 	trayTip   string
+	// badge is the count the dock shows already, so that a frame that
+	// changes nothing does not tell the system again.
+	badge int
+
+	// seenAt is when each download first showed, so that its row slides in
+	// once rather than every time the list scrolls it back into view.
+	seenAt map[string]time.Time
+	// finishedAt is when each download landed, for the moment its row shows
+	// it. The manager's events write it off the main thread.
+	finishedAt map[string]time.Time
+
+	// newRun counts the times the New Download sheet opened, so that its
+	// entrance plays again rather than only once.
+	newRun uint64
 
 	tasks    []download.Task
 	rows     []download.Task
@@ -79,6 +93,19 @@ type App struct {
 	sparkBuf    []float64
 	sparkSmooth []float64
 	sparkPts    [][2]float32
+	// sparkPrev, sparkShown and sparkAt morph the curve from the samples it
+	// drew to the ones it has now, and sparkMorph holds the values on the
+	// way, reused every frame.
+	sparkPrev  []float64
+	sparkShown []float64
+	sparkAt    time.Time
+	sparkMorph []float64
+
+	// insHeat is the chunk map of the task the inspector shows, and
+	// panelHeat those of the downloads the menu bar panel lists: each
+	// tweens its cells from the states it drew to the ones they have now.
+	insHeat    heatTween
+	panelHeats map[string]*heatTween
 }
 
 // start opens the store, the download manager and the local API, then the
@@ -233,6 +260,7 @@ func (a *App) persistAsync() {
 
 func (a *App) refresh() {
 	a.tasks = a.mgr.List()
+	a.noteTasks(a.tasks, time.Now())
 	query := strings.ToLower(strings.TrimSpace(a.search))
 	a.rows = a.rows[:0]
 	for _, t := range a.tasks {
@@ -257,8 +285,81 @@ func (a *App) refresh() {
 	// and the chart would sit frozen with the curve in mid-air.
 	a.settlePause()
 	if mygo.App.IsReady() {
-		mygo.App.SetBadgeCount(a.mgr.ActiveCount())
+		// The dock is told only when the count it shows changes: a frame
+		// that animates the window would otherwise call the system sixty
+		// times a second for nothing.
+		if n := a.mgr.ActiveCount(); n != a.badge {
+			a.badge = n
+			mygo.App.SetBadgeCount(n)
+		}
 	}
+}
+
+// noteTasks remembers when each download first showed, and forgets the ones
+// gone: the list slides a row in for a new download, not for one that
+// scrolled back into view.
+func (a *App) noteTasks(tasks []download.Task, now time.Time) {
+	if a.seenAt == nil {
+		a.seenAt = make(map[string]time.Time, len(tasks))
+	}
+	for _, t := range tasks {
+		if _, ok := a.seenAt[t.ID]; !ok {
+			a.seenAt[t.ID] = now
+		}
+	}
+	if len(a.seenAt) > 2*len(tasks)+8 {
+		live := make(map[string]time.Time, len(tasks))
+		for _, t := range tasks {
+			if at, ok := a.seenAt[t.ID]; ok {
+				live[t.ID] = at
+			}
+		}
+		a.seenAt = live
+	}
+}
+
+// fresh reports whether the download showed up within d.
+func (a *App) fresh(id string, d time.Duration) bool {
+	at, ok := a.seenAt[id]
+	return ok && time.Since(at) < d
+}
+
+// markFinished remembers that a download landed, for its row to show it.
+func (a *App) markFinished(id string) {
+	a.mu.Lock()
+	if a.finishedAt == nil {
+		a.finishedAt = map[string]time.Time{}
+	}
+	if len(a.finishedAt) > 64 {
+		for k, at := range a.finishedAt {
+			if time.Since(at) > finishFor {
+				delete(a.finishedAt, k)
+			}
+		}
+	}
+	a.finishedAt[id] = time.Now()
+	a.mu.Unlock()
+}
+
+// finishedAgo is how long ago the download landed, and whether it did.
+func (a *App) finishedAgo(id string) (time.Duration, bool) {
+	a.mu.Lock()
+	at, ok := a.finishedAt[id]
+	a.mu.Unlock()
+	if !ok {
+		return 0, false
+	}
+	return time.Since(at), true
+}
+
+// flash is how much of the moment a landed download shows: 1 as it lands,
+// 0 once the moment is over.
+func (a *App) flash(id string) float32 {
+	ago, ok := a.finishedAgo(id)
+	if !ok || ago > finishFor {
+		return 0
+	}
+	return 1 - float32(ago)/float32(finishFor)
 }
 
 // sampleSpeeds records the throughput of the running downloads once a
@@ -344,6 +445,7 @@ func (a *App) onDownloadEvent(e download.Event) {
 	a.persistAsync()
 	switch e.Kind {
 	case download.EventCompleted:
+		a.markFinished(e.Task.ID)
 		a.notify(locales.NotifCompleted(), e.Task.FileName, e.Task.ID)
 	case download.EventFailed:
 		a.notify(locales.NotifFailed(), e.Task.FileName, e.Task.ID)

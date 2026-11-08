@@ -9,7 +9,7 @@ import (
 // newDialog is the New Download sheet. The modal's own panel is the card, so
 // the dialog has a single surface, like the rest of the window.
 func (a *App) newDialog(c *ui.Context) {
-	ui.Modal(c, &a.newOpen, func() {
+	dlg := ui.Modal(c, &a.newOpen, func() {
 		ui.Column(c).FillWidth().Gap(12).Children(func() {
 			ui.Text(c, locales.NewDownloadTitle()).FontSize(16).Bold().TextColor(colText)
 
@@ -49,4 +49,14 @@ func (a *App) newDialog(c *ui.Context) {
 		})
 	}).Width(430).Padding(20).Radius(14).Background(colCard).Border(1, colLine).
 		Shadow(0, 18, 50, 0, ui.RGBA(20, 20, 30, 0.18))
+
+	// The sheet steps up and grows into place from a timeline rather than an
+	// Enter: the modal's panel is new in the frame it shows, so there is no
+	// parent for an Enter to arrive in.
+	if a.newOpen {
+		tl := dlg.Timeline("open", ui.TimelineOptions{Run: a.newRun})
+		o := tl.Tween(ui.Tween{From: 0.6, To: 1, Duration: motionBase, Ease: ui.EaseOut})
+		s := tl.Tween(ui.Tween{From: 0.97, To: 1, Duration: motionSlow, Ease: ui.EaseOut}, ui.WithPrevious(0))
+		dlg.Opacity(o).Transform(ui.Scaling(s, s))
+	}
 }

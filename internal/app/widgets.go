@@ -19,6 +19,10 @@ func (a *App) pillButton(c *ui.Context, label string, icon *ui.SVG, primary bool
 			b = b.Background(ui.RGB(0xFF, 0xFF, 0xFF)).Border(1, colEdge)
 		}
 	}
+	// The colour fades in and out of the frame that follows the pointer,
+	// and the press is a small step down rather than a jump.
+	b.Transition(hoverColors)
+	b.AnimatePose(pressPose(b), springSnap)
 	b.OnClick(fn)
 	b.Children(func() {
 		if icon != nil {
@@ -38,6 +42,18 @@ func (a *App) pillButton(c *ui.Context, label string, icon *ui.SVG, primary bool
 	return b
 }
 
+// pressPose is where a control shows under the pointer: a step down while
+// it is pressed, and a breath of a lift while it is not.
+func pressPose(e ui.Element) ui.Pose {
+	switch {
+	case e.Pressed():
+		return ui.Pose{Scale: 0.97}
+	case e.Hovered():
+		return ui.Pose{Scale: 1.012}
+	}
+	return ui.Pose{}
+}
+
 func (a *App) secondaryButton(c *ui.Context, label string, fn func()) ui.Element {
 	return a.pillButton(c, label, nil, false, fn)
 }
@@ -52,6 +68,8 @@ func (a *App) iconButton(c *ui.Context, icon *ui.SVG, tip string, fn func()) ui.
 	if btn.Hovered() {
 		btn = btn.Background(ui.RGBA(28, 28, 30, 0.06))
 	}
+	btn.Transition(hoverColors)
+	btn.AnimatePose(pressPose(btn), springSnap)
 	return btn.Tooltip(tip).OnClick(fn).Children(func() {
 		ui.Icon(c, icon).FontSize(15).TextColor(colMuted)
 	})

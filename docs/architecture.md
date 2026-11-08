@@ -16,6 +16,8 @@ Segra 是单一 Go 二进制：根目录只留一个 `main.go` 负责启动，�
 │   │   ├── api.go            本地 API（扩展端口）启停、令牌、深链
 │   │   ├── actions.go        界面动作：新建/暂停/继续/移除/打开位置、设置保存
 │   │   ├── theme.go          调色板与 mygo 主题（颜色、圆角、滚动条）
+│   │   ├── motion.go         动效令牌：时长、弹簧、入场位移
+│   │   ├── heat.go           分片热力图的自绘与逐格插值
 │   │   ├── widgets.go        无状态控件：胶囊按钮、图标按钮、chip、开关行
 │   │   ├── view.go           窗口骨架：侧栏、内容列、标题行、空状态、状态栏
 │   │   ├── view_list.go      下载列表的行、行内统计、行内操作、右键菜单
@@ -41,7 +43,7 @@ Segra 是单一 Go 二进制：根目录只留一个 `main.go` 负责启动，�
 ├── locales/                  中英文目录与生成的访问器
 ├── resources/                icon.png（打包图标，mygo.json 引用）与 tray.png（菜单栏）
 ├── extension/                Chromium MV3 扩展
-└── docs/                     截图与本文档
+└── docs/                     截图、架构与动效说明
 ```
 
 ## 分层与依赖方向

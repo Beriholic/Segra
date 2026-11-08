@@ -30,14 +30,20 @@ func (a *App) inspector(c *ui.Context, strip float32) {
 		target = 66
 	}
 	panel := ui.Column(c).FillHeight().Background(colSurface).Clip()
-	width := panel.Animate("details-width", target, 190*time.Millisecond)
+	width := panel.AnimateTo("details-width", target, springSoft)
 	panel.Width(width).Children(func() {
 		ui.Box(c).Absolute().Left(0).Top(0).Bottom(0).Width(1).Background(colLineSoft)
 
 		// The body keeps its width while the panel folds, so it slides out of
 		// view instead of reflowing, and is drawn only while there is room.
 		if width > 200 {
-			ui.Column(c).Width(304).Grow(1).Children(func() {
+			body := ui.Column(c).Width(304).Grow(1).
+				Transition(ui.ElementTransition{
+					Animation: &springSoft,
+					Enter:     fadeIn(14),
+					Exit:      &ui.Motion{Opacity: 0},
+				})
+			body.Children(func() {
 				ui.Row(c).Padding(0, 60, 0, 20).Height(strip + 30).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, locales.TaskDetails()).FontSize(14).Bold().SingleLine().TextColor(colText)
 				})
@@ -45,17 +51,27 @@ func (a *App) inspector(c *ui.Context, strip float32) {
 					ui.Spacer(c)
 					return
 				}
-				ui.Scroll(c).Grow(1).Children(func() {
-					ui.Column(c).Padding(0, 20, 18, 20).Gap(20).Children(func() {
-						a.inspectorFile(c, *t)
-						a.inspectorProgress(c, *t)
-						a.inspectorStats(c, *t)
-						if t.Status == download.StatusDownloading || t.Status == download.StatusPaused {
-							a.inspectorSpark(c)
-						}
-						a.inspectorShards(c, *t)
-						a.inspectorMeta(c, *t)
-						a.inspectorEvents(c, *t)
+				// One task's details give way to another's with a slide: the
+				// column is keyed by the download, so the old one leaves as
+				// the new one arrives.
+				// One task's details replace another's at once, the new ones
+				// rising a little: the column has no surface of its own, so
+				// a crossfade would show two files' names at once.
+				details := ui.Column(c).Key(t.ID).Grow(1).
+					Transition(ui.ElementTransition{Animation: &springSoft, Enter: fadeIn(8)})
+				details.Children(func() {
+					ui.Scroll(c).Grow(1).Children(func() {
+						ui.Column(c).Padding(0, 20, 18, 20).Gap(20).Children(func() {
+							a.inspectorFile(c, *t)
+							a.inspectorProgress(c, *t)
+							a.inspectorStats(c, *t)
+							if t.Status == download.StatusDownloading || t.Status == download.StatusPaused {
+								a.inspectorSpark(c)
+							}
+							a.inspectorShards(c, *t)
+							a.inspectorMeta(c, *t)
+							a.inspectorEvents(c, *t)
+						})
 					})
 				})
 			})
@@ -92,8 +108,7 @@ func (a *App) inspectorFile(c *ui.Context, t download.Task) {
 
 func (a *App) inspectorProgress(c *ui.Context, t download.Task) {
 	pct := t.Percent()
-	done := t.Status == download.StatusCompleted
-	if done {
+	if t.Status == download.StatusCompleted {
 		pct = 1
 	}
 	ui.Column(c).Gap(10).Children(func() {
@@ -102,11 +117,13 @@ func (a *App) inspectorProgress(c *ui.Context, t download.Task) {
 			ui.Spacer(c)
 			ui.Text(c, fmt.Sprintf("%s / %s", formatBytes(t.Downloaded), sizeLabel(t.Size))).FontSize(12).TextColor(colMuted)
 		})
-		if !done {
-			ui.Box(c).Height(6).Radius(3).Background(colLineSoft).Children(func() {
-				ui.Box(c).Height(6).Radius(3).WidthPercent(float32(pct * 100)).Background(progressColor(t))
-			})
-		}
+		// The bar glides to the share it has, rather than jumping every time
+		// the manager reports progress.
+		ui.Box(c).Height(6).Radius(3).Background(colLineSoft).Children(func() {
+			bar := ui.Box(c).Height(6).Radius(3)
+			bar.WidthPercent(bar.AnimateTo("pct", float32(pct*100), fadeCurve)).
+				Background(progressColor(t))
+		})
 	})
 }
 
@@ -221,7 +238,7 @@ const sparkSlots = 60
 // a transfer keeps only the floor, so an idle minute reads as a chart at
 // rest rather than a green line stuck to the bottom.
 func (a *App) drawSpark(p *ui.Painter, r ui.Rect) {
-	vals := a.sparkSeries()
+	vals, moving := a.sparkFlow(a.sparkSeries(), p.Now())
 	if len(vals) < 2 {
 		return
 	}
@@ -282,6 +299,57 @@ func (a *App) drawSpark(p *ui.Painter, r ui.Rect) {
 		sparkCurve(curve, pts, start, end, plot.Y, floor)
 		p.StrokePath(curve, 1.6, colGreen)
 	}
+	if moving {
+		// The curve is still flowing to the samples it has: draw frames that
+		// only paint until it arrives, without building the view again.
+		p.AnimationFrame()
+	}
+}
+
+// sparkMorph is how long the curve takes to flow from the samples it drew to
+// the ones it has now, so that a new second stretches it rather than
+// replacing it.
+const sparkMorph = 500 * time.Millisecond
+
+// sparkFlow returns the values the curve shows now: the samples it has, on
+// their way from the ones the last frame drew, and whether it is still
+// moving.
+func (a *App) sparkFlow(vals []float64, now time.Time) ([]float64, bool) {
+	if !sameFloats(a.sparkShown, vals) {
+		a.sparkPrev = a.sparkShown
+		a.sparkShown = append([]float64(nil), vals...)
+		a.sparkAt = now
+	}
+	k := float32(now.Sub(a.sparkAt)) / float32(sparkMorph)
+	if k >= 1 || len(a.sparkPrev) == 0 {
+		return a.sparkShown, false
+	}
+	k = ui.EaseOut(max(k, 0))
+	out := a.sparkMorph[:0]
+	for i := range a.sparkShown {
+		// Samples arrive at the right edge, so the curves line up there.
+		j := len(a.sparkPrev) - (len(a.sparkShown) - i)
+		prev := 0.0
+		if j >= 0 {
+			prev = a.sparkPrev[j]
+		}
+		out = append(out, prev+(a.sparkShown[i]-prev)*float64(k))
+	}
+	a.sparkMorph = out
+	return out, true
+}
+
+// sameFloats reports whether two series say the same thing.
+func sameFloats(a, b []float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // sparkCurve appends a curve through pts[from..to], whose current point is
@@ -420,6 +488,11 @@ func blockColor(state blockState, paused bool) ui.Color {
 	return colBlockTrack
 }
 
+// inspectorHeatHeight is the room the chunk map takes in the panel: the
+// cells of a row and the gaps between, plus the slack a drawn grid uses to
+// centre itself.
+const inspectorHeatHeight = chunkRows*chunkSize + (chunkRows-1)*chunkGap + 1
+
 func (a *App) inspectorShards(c *ui.Context, t download.Task) {
 	cells := chunkBlocks(t)
 	if len(cells) == 0 {
@@ -428,16 +501,10 @@ func (a *App) inspectorShards(c *ui.Context, t download.Task) {
 	paused := t.Status == download.StatusPaused
 	ui.Column(c).Gap(8).Children(func() {
 		ui.Text(c, locales.ShardProgress()).FontSize(11.5).TextColor(colLabel)
-		ui.Column(c).Gap(chunkGap).Children(func() {
-			for row := 0; row < chunkRows; row++ {
-				line := cells[row*chunkCols : (row+1)*chunkCols]
-				ui.Row(c).Gap(chunkGap).Children(func() {
-					for _, state := range line {
-						ui.Box(c).Width(chunkSize).Height(chunkSize).
-							Radius(1.5).Background(blockColor(state, paused))
-					}
-				})
-			}
+		// Drawn rather than built from a box a cell, and tweened as the
+		// frontier moves: the grid costs one element, not ninety-six.
+		ui.Box(c).Height(inspectorHeatHeight).FillWidth().Draw(func(p *ui.Painter, r ui.Rect) {
+			drawHeat(p, r, &a.insHeat, t.ID, cells, paused, chunkGap)
 		})
 	})
 }

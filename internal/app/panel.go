@@ -163,6 +163,14 @@ func (a *App) panelView(c *ui.Context) {
 	}
 
 	tasks := panelTasks(a.tasks)
+	// The flyout window shows at once; its card steps up from a few points
+	// below and fades in, so that the panel reads as opening rather than
+	// blinking on.
+	tl := box.Timeline("open", ui.TimelineOptions{})
+	y := tl.Tween(ui.Tween{From: 5, To: 0, Duration: motionBase, Ease: ui.EaseOut})
+	o := tl.Tween(ui.Tween{From: 0.7, To: 1, Duration: motionBase, Ease: ui.EaseOut}, ui.WithPrevious(0))
+	box.Translate(0, y).Opacity(o)
+
 	box.Padding(panelPad).Gap(panelGap).Children(func() {
 		if len(tasks) == 0 {
 			ui.Text(c, locales.PanelIdle()).FontSize(12).TextColor(colMuted).SingleLine().Ellipsis("…")
@@ -233,8 +241,11 @@ func (a *App) panelRow(c *ui.Context, t download.Task) {
 	})
 }
 
+// panelHeatHeight is the room the chunk map takes in the panel.
+const panelHeatHeight = chunkRows*panelCell + (chunkRows-1)*panelCellGap
+
 // panelHeat draws the chunk map of one download, the grid the inspector
-// draws, sized for the panel.
+// draws, sized for the panel, its cells lighting up as the bytes land.
 func (a *App) panelHeat(c *ui.Context, t download.Task, paused bool) {
 	cells := chunkBlocks(t)
 	if len(cells) == 0 {
@@ -242,17 +253,27 @@ func (a *App) panelHeat(c *ui.Context, t download.Task, paused bool) {
 		// the same, so the row keeps its height.
 		cells = make([]blockState, chunkRows*chunkCols)
 	}
-	ui.Column(c).Gap(panelCellGap).Children(func() {
-		for row := 0; row < chunkRows; row++ {
-			line := cells[row*chunkCols : (row+1)*chunkCols]
-			ui.Row(c).Gap(panelCellGap).Children(func() {
-				for _, state := range line {
-					ui.Box(c).Width(panelCell).Height(panelCell).Radius(2).
-						Background(blockColor(state, paused))
-				}
-			})
-		}
+	h := a.panelHeatFor(t.ID)
+	ui.Box(c).Height(panelHeatHeight).FillWidth().Draw(func(p *ui.Painter, r ui.Rect) {
+		drawHeat(p, r, h, t.ID, cells, paused, panelCellGap)
 	})
+}
+
+// panelHeatFor returns the chunk map the panel tweens for one download,
+// kept between frames so that its cells move from what they showed.
+func (a *App) panelHeatFor(id string) *heatTween {
+	if a.panelHeats == nil {
+		a.panelHeats = map[string]*heatTween{}
+	}
+	h := a.panelHeats[id]
+	if h == nil {
+		if len(a.panelHeats) > 12 {
+			clear(a.panelHeats)
+		}
+		h = &heatTween{}
+		a.panelHeats[id] = h
+	}
+	return h
 }
 
 // panelMeta is the line under a chunk map: the bytes of the file on disk.
