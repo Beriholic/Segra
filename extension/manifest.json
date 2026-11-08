@@ -2,18 +2,20 @@
   "manifest_version": 3,
   "name": "__MSG_appName__",
   "description": "__MSG_appDescription__",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "default_locale": "en",
   "minimum_chrome_version": "116",
   "permissions": [
     "contextMenus",
     "storage",
     "notifications",
-    "activeTab"
+    "downloads",
+    "cookies"
   ],
   "host_permissions": [
     "http://127.0.0.1/*",
-    "http://localhost/*"
+    "http://localhost/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js",
@@ -28,10 +30,6 @@
       "48": "icons/48.png",
       "128": "icons/128.png"
     }
-  },
-  "options_ui": {
-    "page": "options.html",
-    "open_in_tab": true
   },
   "icons": {
     "16": "icons/16.png",

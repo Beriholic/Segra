@@ -14,24 +14,30 @@
     </header>
     <main>
       <label>
-        <span data-i18n="popupUrl"></span>
-        <input id="url" type="url" spellcheck="false" autocomplete="off" />
+        <span data-i18n="popupPort"></span>
+        <input id="port" type="number" min="1024" max="65535" step="1" />
       </label>
       <label>
-        <span data-i18n="popupName"></span>
-        <input id="name" type="text" spellcheck="false" autocomplete="off" />
+        <span data-i18n="popupToken"></span>
+        <input id="token" class="token" type="text" spellcheck="false" autocomplete="off" />
       </label>
-      <label>
-        <span data-i18n="popupDir"></span>
-        <input id="dir" type="text" spellcheck="false" autocomplete="off" />
-      </label>
-      <button id="send" class="primary" data-i18n="popupSend"></button>
+      <div class="row">
+        <button id="save" class="primary" data-i18n="popupSave"></button>
+        <button id="test" data-i18n="popupTest"></button>
+      </div>
       <p id="status" class="status" role="status"></p>
+
+      <hr />
+
+      <label class="switch">
+        <input id="intercept" type="checkbox" />
+        <span data-i18n="popupIntercept"></span>
+      </label>
+      <p class="hint" data-i18n="popupInterceptHint"></p>
     </main>
     <footer>
-      <a id="options" href="#" data-i18n="openOptions"></a>
       <span id="server" class="muted"></span>
     </footer>
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

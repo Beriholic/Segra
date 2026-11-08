@@ -3,10 +3,10 @@
     "message": "Segra 下载器"
   },
   "appDescription": {
-    "message": "把下载任务交给 Segra 桌面应用。"
+    "message": "把浏览器里的下载交给 Segra 桌面应用。"
   },
   "actionTitle": {
-    "message": "发送到 Segra"
+    "message": "Segra 设置"
   },
   "contextLink": {
     "message": "使用 Segra 下载"
@@ -26,61 +26,25 @@
   "errorToken": {
     "message": "API 令牌不正确。请从 Segra 设置中复制并粘贴到这里。"
   },
-  "errorUrl": {
-    "message": "请输入下载链接。"
-  },
   "errorPort": {
     "message": "端口必须在 1024 到 65535 之间。"
   },
-  "popupUrl": {
-    "message": "链接"
-  },
-  "popupName": {
-    "message": "文件名（可选）"
-  },
-  "popupDir": {
-    "message": "保存到（可选）"
-  },
-  "popupSend": {
-    "message": "使用 Segra 下载"
-  },
-  "popupSending": {
-    "message": "正在发送…"
-  },
-  "popupSent": {
-    "message": "已加入 Segra 队列"
-  },
-  "popupNoServer": {
-    "message": "Segra 没有运行"
-  },
-  "statusOnline": {
-    "message": "已连接"
-  },
-  "openOptions": {
-    "message": "设置"
-  },
-  "optionsTitle": {
-    "message": "Segra 扩展设置"
-  },
-  "optionsHint": {
-    "message": "打开 Segra → 设置，复制 API 令牌并粘贴到这里。端口显示在令牌旁边。"
-  },
-  "optionsPort": {
+  "popupPort": {
     "message": "API 端口"
   },
-  "optionsToken": {
+  "popupToken": {
     "message": "API 令牌"
   },
-  "optionsSave": {
+  "popupSave": {
     "message": "保存"
   },
-  "optionsTest": {
+  "popupTest": {
     "message": "测试连接"
   },
-  "optionsSaved": {
+  "popupSaved": {
     "message": "已保存。"
   },
-  "optionsOk": {
+  "popupConnected": {
     "message": "已连接到 Segra $VERSION$。",
     "placeholders": {
       "version": {
@@ -88,16 +52,16 @@
       }
     }
   },
-  "optionsServer": {
-    "message": "已连接的应用"
+  "popupIntercept": {
+    "message": "把浏览器下载交给 Segra"
   },
-  "optionsServerVersion": {
-    "message": "版本"
+  "popupInterceptHint": {
+    "message": "浏览器里开始的下载会被取消，改由 Segra 下载，并带上同一份 Cookie 和 referrer。关掉就留在浏览器里。"
   },
-  "optionsDownloadDir": {
-    "message": "下载文件夹"
+  "popupNoServer": {
+    "message": "Segra 没有运行"
   },
-  "optionsConnections": {
-    "message": "连接数"
+  "statusOnline": {
+    "message": "已连接"
   }
 }

@@ -43,12 +43,6 @@ body.popup {
   width: 340px;
 }
 
-body.options {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 0 24px 40px;
-}
-
 .bar {
   display: flex;
   align-items: center;
@@ -81,21 +75,6 @@ main {
   padding: 14px;
 }
 
-body.options main {
-  padding: 24px 0 0;
-  gap: 14px;
-}
-
-h1 {
-  margin: 0;
-  font-size: 20px;
-}
-
-h2 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-
 label {
   display: flex;
   flex-direction: column;
@@ -113,6 +92,11 @@ input {
   color: var(--fg);
   font: inherit;
   font-size: 13px;
+}
+
+input.token {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
 }
 
 input:focus {
@@ -152,6 +136,10 @@ button.primary {
   gap: 8px;
 }
 
+.row button {
+  flex: 1;
+}
+
 .status {
   min-height: 18px;
   margin: 0;
@@ -163,6 +151,37 @@ button.primary {
   color: var(--danger);
 }
 
+hr {
+  height: 0;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* The switch is a row of its own: the box, then the label, both centred. */
+label.switch {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+  font-size: 13px;
+}
+
+label.switch input {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.hint {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 footer {
   display: flex;
   align-items: center;
@@ -171,41 +190,4 @@ footer {
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 11px;
-}
-
-footer a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-footer .muted {
-  margin-left: auto;
-}
-
-.muted {
-  color: var(--muted);
-}
-
-.card {
-  margin-top: 8px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-dl {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 6px 16px;
-  margin: 0;
-}
-
-dt {
-  color: var(--muted);
-}
-
-dd {
-  margin: 0;
-  overflow-wrap: anywhere;
 }

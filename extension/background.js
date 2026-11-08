@@ -1,45 +1,14 @@
 // Segra's MV3 service worker: context-menu submission, port discovery and
 // the API client shared with the popup and options pages.
 
-const DEFAULT_PORT = 47823;
+import { DEFAULT_PORT, readConfig } from "./config.js";
+
 const PORT_SCAN = 10;
 
 const t = (key, ...subs) => {
   const message = chrome.i18n.getMessage(key, subs);
   return message || key;
 };
-
-// readBaked returns the port and token Segra wrote into the copy it
-// exported, or null for a copy loaded from the repository.
-async function readBaked() {
-  try {
-    const response = await fetch(chrome.runtime.getURL("config.json"), { cache: "no-store" });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data && typeof data === "object" ? data : null;
-  } catch {
-    return null;
-  }
-}
-
-// getConfig is the settings the user saved, seeded on first use from the
-// config.json of an exported copy, so that loading one needs no setup.
-async function getConfig() {
-  const stored = await chrome.storage.local.get({ port: DEFAULT_PORT, token: "" });
-  const config = {
-    port: Number(stored.port) || DEFAULT_PORT,
-    token: String(stored.token || ""),
-  };
-  if (!config.token) {
-    const baked = await readBaked();
-    if (baked) {
-      config.port = Number(baked.port) || config.port;
-      config.token = String(baked.token || "");
-      if (config.token) await chrome.storage.local.set(config);
-    }
-  }
-  return config;
-}
 
 async function probe(port) {
   try {
@@ -71,7 +40,7 @@ async function findServer(preferred) {
 }
 
 async function api(path, init = {}) {
-  const { port, token } = await getConfig();
+  const { port, token } = await readConfig();
   const server = await findServer(port);
   if (!server) throw new Error("server");
 
@@ -103,11 +72,12 @@ async function api(path, init = {}) {
   return data;
 }
 
-async function submitTask({ url, referer, filename, dir }) {
+async function submitTask({ url, referer, filename, dir, cookie }) {
   const body = { url };
   if (referer) body.referer = referer;
   if (filename) body.fileName = filename;
   if (dir) body.dir = dir;
+  if (cookie) body.cookie = cookie;
   body.userAgent = navigator.userAgent;
   return api("/api/tasks", { method: "POST", body: JSON.stringify(body) });
 }
@@ -154,6 +124,78 @@ function hostOf(rawURL) {
   }
 }
 
+// baseName is the last part of a path, as the browser's own download list
+// spells the file it is saving.
+function baseName(path) {
+  const parts = String(path || "").split(/[\\/]/);
+  return parts[parts.length - 1] || "";
+}
+
+// cookiesFor is the header the browser would send with url, so that a file
+// behind a login survives the trip through the app. Chrome answers with the
+// cookies of the sites the extension may read, and nothing for the rest.
+async function cookiesFor(url) {
+  try {
+    const cookies = await chrome.cookies.getAll({ url });
+    return cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  } catch {
+    return "";
+  }
+}
+
+// dropDownload takes a download out of the browser, list and file alike.
+async function dropDownload(id) {
+  try {
+    await chrome.downloads.cancel(id);
+  } catch {
+    // It finished before we got here: it stays, beside Segra's copy.
+  }
+  try {
+    await chrome.downloads.erase({ id });
+  } catch {
+    // Erasing is tidying, not the point.
+  }
+}
+
+// interceptDownload hands a download the browser started to Segra and takes
+// the browser's copy away. Segra is asked first: a download the app refuses
+// stays where it is, and the browser is never left holding nothing.
+async function interceptDownload(item) {
+  // The ones this extension started, as the download handed back below.
+  if (item.byExtensionId === chrome.runtime.id) return;
+
+  const url = item.finalUrl || item.url || "";
+  if (!/^https?:/i.test(url)) return;
+
+  const { intercept } = await chrome.storage.local.get({ intercept: true });
+  if (!intercept) return;
+
+  const { port } = await readConfig();
+  // Segra is not running: the browser keeps what it started, as it would
+  // with the extension switched off.
+  if (!(await findServer(port))) return;
+
+  const filename = baseName(item.filename) || guessName(url);
+  try {
+    await submitTask({
+      url,
+      referer: item.referrer || "",
+      filename,
+      cookie: await cookiesFor(url)
+    });
+  } catch (error) {
+    // Segra said no, so the browser takes the download back rather than
+    // lose it: this one is started by the extension, and skipped above.
+    chrome.downloads.download({ url, filename: filename || undefined }).catch(() => {});
+    await notify(t("notifFailed"), explain(error));
+    return;
+  }
+
+  await dropDownload(item.id);
+  // No notification on the way in: the app already shows the download, and
+  // a browser that downloads in bulk would ring once per file.
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
@@ -185,18 +227,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
+chrome.downloads.onCreated.addListener((item) => {
+  interceptDownload(item).catch(() => {});
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || typeof message.type !== "string") return false;
 
-  if (message.type === "submit") {
-    submitTask(message)
-      .then((task) => sendResponse({ ok: true, task }))
-      .catch((error) => sendResponse({ ok: false, error: explain(error) }));
-    return true;
-  }
-
   if (message.type === "status") {
-    getConfig()
+    readConfig()
       .then(async ({ port, token }) => {
         const server = await findServer(port);
         sendResponse({

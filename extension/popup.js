@@ -1,101 +1,84 @@
-const t = (key) => chrome.i18n.getMessage(key) || key;
+import { readConfig } from "./config.js";
+
+const t = (key, ...subs) => chrome.i18n.getMessage(key, subs) || key;
 
 for (const element of document.querySelectorAll("[data-i18n]")) {
   element.textContent = t(element.dataset.i18n);
 }
 
-const urlInput = document.getElementById("url");
-const nameInput = document.getElementById("name");
-const dirInput = document.getElementById("dir");
-const sendButton = document.getElementById("send");
+const portInput = document.getElementById("port");
+const tokenInput = document.getElementById("token");
+const interceptInput = document.getElementById("intercept");
+const saveButton = document.getElementById("save");
+const testButton = document.getElementById("test");
 const status = document.getElementById("status");
 const dot = document.getElementById("dot");
 const server = document.getElementById("server");
-const optionsLink = document.getElementById("options");
 
-function guessName(raw) {
-  try {
-    const url = new URL(raw);
-    const last = url.pathname.split("/").filter(Boolean).pop();
-    if (!last) return "";
-    return decodeURIComponent(last);
-  } catch {
-    return "";
-  }
+function setStatus(message, isError = false) {
+  status.textContent = message;
+  status.classList.toggle("error", isError);
 }
 
-async function refreshStatus() {
+// check asks the worker where Segra is, and says so in the footer and the
+// dot. It returns what the worker answered, or null.
+async function check() {
   const answer = await chrome.runtime.sendMessage({ type: "status" });
   if (answer && answer.ok) {
     dot.classList.add("online");
     dot.title = t("statusOnline");
-    server.textContent = `127.0.0.1:${answer.port}`;
+    server.textContent = answer.version
+      ? `127.0.0.1:${answer.port} · v${answer.version}`
+      : `127.0.0.1:${answer.port}`;
+    return answer;
+  }
+  dot.classList.remove("online");
+  dot.title = t("errorServer");
+  server.textContent = t("popupNoServer");
+  return null;
+}
+
+async function load() {
+  const config = await readConfig();
+  portInput.value = String(config.port);
+  tokenInput.value = config.token;
+  interceptInput.checked = config.intercept;
+  await check();
+}
+
+async function save() {
+  const port = Number(portInput.value);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    setStatus(t("errorPort"), true);
+    return;
+  }
+  await chrome.storage.local.set({ port, token: tokenInput.value.trim() });
+  setStatus(t("popupSaved"));
+  await check();
+}
+
+async function test() {
+  testButton.disabled = true;
+  const answer = await check();
+  testButton.disabled = false;
+  if (answer) {
+    setStatus(t("popupConnected", answer.version || ""));
   } else {
-    dot.classList.remove("online");
-    dot.title = t("errorServer");
-    server.textContent = t("popupNoServer");
-  }
-  return answer;
-}
-
-async function prefill() {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab && tab.url && /^https?:/i.test(tab.url)) {
-      urlInput.value = tab.url;
-      nameInput.value = guessName(tab.url);
-    }
-  } catch {
-    // The popup works without the active tab.
+    setStatus(t("errorServer"), true);
   }
 }
 
-urlInput.addEventListener("input", () => {
-  if (!nameInput.value || nameInput.value === guessName(urlInput.dataset.last || "")) {
-    nameInput.value = guessName(urlInput.value);
-  }
-  urlInput.dataset.last = urlInput.value;
-});
-
-urlInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") sendButton.click();
-});
-
-sendButton.addEventListener("click", async () => {
-  const url = urlInput.value.trim();
-  if (!url) {
-    status.textContent = t("errorUrl");
-    status.classList.add("error");
-    urlInput.focus();
-    return;
-  }
-
-  sendButton.disabled = true;
-  status.classList.remove("error");
-  status.textContent = t("popupSending");
-
-  const answer = await chrome.runtime.sendMessage({
-    type: "submit",
-    url,
-    filename: nameInput.value.trim(),
-    dir: dirInput.value.trim(),
+saveButton.addEventListener("click", save);
+testButton.addEventListener("click", test);
+for (const input of [portInput, tokenInput]) {
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") save();
   });
+}
 
-  if (answer && answer.ok) {
-    status.textContent = t("popupSent");
-    setTimeout(() => window.close(), 700);
-    return;
-  }
-
-  sendButton.disabled = false;
-  status.classList.add("error");
-  status.textContent = (answer && answer.error) || t("errorServer");
+interceptInput.addEventListener("change", async () => {
+  await chrome.storage.local.set({ intercept: interceptInput.checked });
+  setStatus(t("popupSaved"));
 });
 
-optionsLink.addEventListener("click", (event) => {
-  event.preventDefault();
-  chrome.runtime.openOptionsPage();
-});
-
-refreshStatus();
-prefill();
+load();

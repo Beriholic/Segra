@@ -45,10 +45,9 @@ func TestExtensionZip(t *testing.T) {
 	for _, name := range []string{
 		"manifest.json",
 		"background.js",
-		"options.js",
+		"config.js",
 		"popup.js",
 		"popup.html",
-		"options.html",
 		"style.css",
 		"icons/16.png",
 		"icons/128.png",

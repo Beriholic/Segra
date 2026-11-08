@@ -4,11 +4,11 @@
     "description": "The extension's name."
   },
   "appDescription": {
-    "message": "Hand downloads to the Segra desktop app.",
+    "message": "Hands the browser's downloads to the Segra desktop app.",
     "description": "The extension's description."
   },
   "actionTitle": {
-    "message": "Send to Segra"
+    "message": "Segra settings"
   },
   "contextLink": {
     "message": "Download with Segra"
@@ -28,61 +28,25 @@
   "errorToken": {
     "message": "Wrong API token. Copy it from Segra's Settings and paste it here."
   },
-  "errorUrl": {
-    "message": "Enter a link to download."
-  },
   "errorPort": {
     "message": "The port must be between 1024 and 65535."
   },
-  "popupUrl": {
-    "message": "Link"
-  },
-  "popupName": {
-    "message": "File name (optional)"
-  },
-  "popupDir": {
-    "message": "Save to (optional)"
-  },
-  "popupSend": {
-    "message": "Download with Segra"
-  },
-  "popupSending": {
-    "message": "Sending…"
-  },
-  "popupSent": {
-    "message": "Queued in Segra"
-  },
-  "popupNoServer": {
-    "message": "Segra is not running"
-  },
-  "statusOnline": {
-    "message": "Connected"
-  },
-  "openOptions": {
-    "message": "Settings"
-  },
-  "optionsTitle": {
-    "message": "Segra extension settings"
-  },
-  "optionsHint": {
-    "message": "Open Segra → Settings, then copy the API token here. The port is shown next to it."
-  },
-  "optionsPort": {
+  "popupPort": {
     "message": "API port"
   },
-  "optionsToken": {
+  "popupToken": {
     "message": "API token"
   },
-  "optionsSave": {
+  "popupSave": {
     "message": "Save"
   },
-  "optionsTest": {
+  "popupTest": {
     "message": "Test connection"
   },
-  "optionsSaved": {
+  "popupSaved": {
     "message": "Saved."
   },
-  "optionsOk": {
+  "popupConnected": {
     "message": "Connected to Segra $VERSION$.",
     "placeholders": {
       "version": {
@@ -90,16 +54,16 @@
       }
     }
   },
-  "optionsServer": {
-    "message": "Connected app"
+  "popupIntercept": {
+    "message": "Send browser downloads to Segra"
   },
-  "optionsServerVersion": {
-    "message": "Version"
+  "popupInterceptHint": {
+    "message": "Downloads the browser starts are cancelled and fetched by Segra instead, with the same cookies and referrer. Turn it off to keep them in the browser."
   },
-  "optionsDownloadDir": {
-    "message": "Download folder"
+  "popupNoServer": {
+    "message": "Segra is not running"
   },
-  "optionsConnections": {
-    "message": "Connections"
+  "statusOnline": {
+    "message": "Connected"
   }
 }
