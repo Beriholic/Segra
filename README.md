@@ -1,126 +1,145 @@
 # Segra
 
-Segra 是一个原生多线程分段下载器：Go + [egoist/mygo](https://github.com/egoist/mygo) 的 GPU 原生 UI，
-不依赖 WebView；附带一个 Chromium MV3 扩展，接管浏览器自己的下载，也能右键把链接、图片、视频直接交给桌面端。
+**English** · [简体中文](README.zh-Hans.md)
+
+Segra is a native multi-threaded segmented downloader: Go with the GPU-native UI of
+[egoist/mygo](https://github.com/egoist/mygo), and no WebView anywhere. It ships with a Chromium
+MV3 extension that takes over the browser's own downloads, and can also hand a link, image or
+video to the desktop app from the context menu.
 
 ![Segra](docs/screenshot.png)
 
-## 功能
+## Features
 
-- **分段下载**：HTTP Range 并发抓取（默认 32 个连接，可调 1–64），按 `Content-Range` 规划分片；
-- **慢连接自动重连**：借鉴 [Surge](https://github.com/SurgeDM/Surge) 的健康检查——某条连接 3 秒没有新数据、或速度低于平均值的 30% 时丢弃并重开，避免被 CDN 的单连接限速拖住；
-  服务器不支持 Range 时自动回退单流下载。
-- **断点续传**：下载中的分片状态写入 `.part.segra.json`，校验大小、ETag、Last-Modified 后续传；
-  暂停、退出、重启都不会丢进度。
-- **队列与并发**：同时下载数可调（1–8），全部暂停 / 全部继续，失败重试。
-- **原生界面**：mygo `ui` 包直接绘制，浅色/深色跟随系统；中英双语，可跟随系统或手动切换。
-- **浏览器扩展**：接管浏览器的下载（取消浏览器那一份，交给 Segra，带同一份 Cookie 和 referrer），
-  也可以右键链接 / 图片 / 视频 / 音频手动提交；工具栏弹窗里配置端口和令牌；
-  自动发现端口，Bearer Token 鉴权。
-- **桌面集成**：单实例、菜单栏托盘、系统通知、关闭到托盘、开机启动、Dock 角标。
-- **本地 API**：只监听 `127.0.0.1`，方便脚本或其他客户端接入。
-- **系统代理**：通过 `mygo/netproxy` 跟随系统代理设置。
+- **Segmented downloads** — parallel HTTP Range requests (32 connections by default, 1–64),
+  planned from `Content-Range`.
+- **Slow connections are replaced** — a health check borrowed from
+  [Surge](https://github.com/SurgeDM/Surge): a connection that brings no new data for 3 seconds,
+  or runs below 30% of the average, is dropped and opened again, so a CDN that throttles one
+  connection cannot hold the whole file back. A server without Range support falls back to a
+  single stream.
+- **Resume** — the state of the segments is written to `.part.segra.json` and checked against the
+  size, `ETag` and `Last-Modified` on the way back in. Pausing, quitting and restarting lose
+  nothing.
+- **Queue and concurrency** — 1–8 downloads at a time, pause all / resume all, retry failures.
+- **Native UI** — drawn by mygo's `ui` package, light and dark following the system, in English
+  and Simplified Chinese, following the system or chosen by hand.
+- **Browser extension** — takes over the browser's downloads: the browser's copy is cancelled and
+  Segra fetches the file with the same cookies and referrer. A link, image, video or audio file
+  can still be sent from the context menu, and the port and token are set in the toolbar popup.
+  Ports are discovered automatically and the API wants a Bearer token.
+- **Desktop integration** — single instance, menu bar tray, system notifications, close to tray,
+  open at login, Dock badge.
+- **Local API** — bound to `127.0.0.1`, for scripts and other clients.
+- **System proxy** — through `mygo/netproxy`, following the system settings.
 
-## 环境要求
+## Requirements
 
-- macOS 12+ / Windows 10+ / Linux（GTK）
-- Go 1.27+（`go.mod` 固定 `go 1.27.3`，`GOTOOLCHAIN=auto` 会自动下载工具链）
-- 纯 Go，无 cgo
+- macOS 12+ / Windows 10+ / Linux (GTK)
+- Go 1.27+ (`go.mod` pins `go 1.27.3`, and `GOTOOLCHAIN=auto` fetches the toolchain)
+- Pure Go, no cgo
 
-## 开发
+## Development
 
 ```bash
-# 可选：把构建缓存放进仓库，避免沙箱/权限问题
+# Optional: keep the build cache inside the repository, away from sandbox
+# and permission trouble.
 export GOCACHE="$PWD/.gocache"
 
-go tool mygo dev        # 热重载开发
-go test ./...           # 单元测试（含 Range / 续传 / 单流回退）
-go tool mygo vet .      # 原生 UI 生命周期检查
+go tool mygo dev        # development build with live reload
+go test ./...           # unit tests (Range, resume, single-stream fallback)
+go tool mygo vet .      # lifetime checks for the native UI
 ```
 
-代码怎么分文件、依赖往哪个方向走，见 [docs/architecture.md](docs/architecture.md)。
+How the code is split into files, and which way the dependencies go, is in
+[docs/architecture.md](docs/architecture.md) (Chinese).
 
-## 打包
+## Building
 
 ```bash
 go tool mygo build
-# macOS: build/darwin-arm64/Segra.app 和 .dmg
-# 也可以指定多平台：
+# macOS: build/darwin-arm64/Segra.app and .dmg
+# Several platforms at once:
 go tool mygo build -platform darwin/universal,windows/amd64,linux/amd64
 
-# 如果当前环境不允许 hdiutil 创建磁盘镜像，只出 .app：
+# Where hdiutil cannot write a disk image, just the .app:
 go tool mygo build -skip-dmg
 ```
 
-应用名、标识符、版本、图标、`segra://` URL scheme、i18n 目录都在 `mygo.json` 里配置。
+The app name, identifier, version, icon, the `segra://` URL scheme and the i18n directory are all
+in `mygo.json`.
 
-## 发布
+## Releasing
 
-推一个 `v` 开头的 tag 就会触发 `.github/workflows/release.yml`：三个平台并行构建，
-产物一起挂到同一个 GitHub Release，不需要任何 secret。
+Pushing a tag that starts with `v` runs `.github/workflows/release.yml`: three runners build in
+parallel and attach everything to one GitHub release. No secrets needed.
 
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-| 平台 | 产物 |
+| Platform | Artifacts |
 | --- | --- |
-| macOS（universal） | `segra-<version>.dmg` |
-| Windows（amd64） | `segra-setup-<version>-amd64.exe`（NSIS 安装包） |
-| Linux（amd64） | `segra_<version>_amd64.deb`、`segra-<version>-linux-amd64.tar.gz`、`PKGBUILD` |
+| macOS (universal) | `segra-<version>.dmg` |
+| Windows (amd64) | `segra-setup-<version>-amd64.exe` (NSIS installer) |
+| Linux (amd64) | `segra_<version>_amd64.deb`, `segra-<version>-linux-amd64.tar.gz`, `PKGBUILD` |
 
-版本号取自 tag：CI 先把 tag 写进 `mygo.json` 再构建，所以仓库里的 `version`
-不用跟着手动改。macOS 只做 ad-hoc 签名、不做公证，别人第一次打开要在 Finder 里
-右键 → 打开，或者 `xattr -d com.apple.quarantine /Applications/Segra.app`。
+The version comes from the tag: the workflow writes it into `mygo.json` before building, so the
+`version` in the repository does not have to be bumped by hand. macOS is signed ad hoc and not
+notarized, so a first launch there needs Open from the context menu, or
+`xattr -d com.apple.quarantine /Applications/Segra.app`.
 
-## 安装浏览器扩展
+## Installing the browser extension
 
-扩展打包在应用里，不需要仓库也不需要编译：
+The extension is packaged inside the app, so no repository and no build step is needed:
 
-1. 打开 Segra 的 **设置 → 浏览器扩展**，点 **导出扩展…**，保存 zip。
-2. 解压它。打开 `chrome://extensions`（Edge/Arc/Brave 同理），开启 **开发者模式**，
-   点 **加载已解压的扩展程序**，选择解压出来的文件夹。
-3. 导出的副本里有一份 `config.json`，带着这台机器当前的端口和令牌，装好即可用。
-   点工具栏图标打开弹窗，可以改端口和令牌、点 **测试连接**，以及开关 **把浏览器下载交给 Segra**。
-4. 之后浏览器里点任何下载，浏览器那一份会被取消，转由 Segra 下载；
-   也可以在网页上右键链接或图片 → **使用 Segra 下载**。
-   直接在 Segra 里点 **新建下载** 粘贴链接同样可以。
+1. Open Segra's **Settings → Browser extension** and click **Export extension…** to save the zip.
+2. Unzip it. Open `chrome://extensions` (Edge, Arc and Brave work the same), turn on **Developer
+   mode**, click **Load unpacked** and choose the unzipped folder.
+3. The exported copy carries a `config.json` with this machine's port and token, so it works as
+   loaded. The toolbar popup changes both, has **Test connection**, and holds the switch that
+   sends the browser's downloads to Segra.
+4. From then on, any download the browser starts is cancelled there and fetched by Segra. A link
+   or image can still be sent from the context menu, and Segra's own **New Download** takes a
+   pasted link as before.
 
-> 端口被占用时 Segra 会从 `47823` 开始向后找最多 10 个端口，扩展会自动发现；
-> 也可以在设置里固定端口。
+> When the port is taken, Segra walks up from `47823` through the next ten; the extension finds
+> it there. The port can also be fixed in the settings.
 
-从仓库开发扩展时，直接把 `extension/` 目录当解压后的文件夹加载即可，
-`config.json` 不存在，弹窗里手填端口和令牌（设置 → 扩展令牌 → 复制令牌）。
+To develop the extension from the repository, load `extension/` itself as the unpacked folder.
+There is no `config.json` then: fill in the port and token in the popup (Settings → Extension
+token → Copy token).
 
-> 接管下载要读 Cookie，扩展因此申请了 `<all_urls>` 权限：不带上 Cookie 的话，
-> 登录后才能访问的文件会下载失败。Segra 没在运行时扩展不拦截，下载照旧留在浏览器里。
+> Taking over downloads needs to read cookies, which is why the extension asks for `<all_urls>`:
+> without the cookies, files behind a login fail to download. Segra not running means no
+> interception — the download stays in the browser.
 
-也可以用 `segra://download?url=<编码后的链接>` 深链直接打开新建下载弹窗：
+A deep link opens the New Download sheet with the link filled in:
 
 ```bash
 open "segra://download?url=https%3A%2F%2Fexample.com%2Fbig.iso"
 ```
 
-## 本地 API
+## Local API
 
-Base URL：`http://127.0.0.1:47823`，除 `/api/health` 外都需要
-`Authorization: Bearer <apiToken>`（或 `X-Segra-Token`）。
+Base URL: `http://127.0.0.1:47823`. Everything but `/api/health` needs
+`Authorization: Bearer <apiToken>` (or `X-Segra-Token`).
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/health` | 存活检查，无需鉴权 |
-| GET | `/api/info` | 版本、下载目录、默认连接数 |
-| GET | `/api/tasks` | 任务列表（新→旧） |
-| POST | `/api/tasks` | 新建任务 |
-| GET | `/api/tasks/{id}` | 单个任务 |
-| DELETE | `/api/tasks/{id}?files=1` | 删除任务，`files=1` 同时删文件 |
-| POST | `/api/tasks/{id}/pause` | 暂停 |
-| POST | `/api/tasks/{id}/resume` | 继续 / 重试 |
-| POST | `/api/pause-all` | 全部暂停 |
-| POST | `/api/resume-all` | 全部继续 |
+| GET | `/api/health` | Liveness, no auth |
+| GET | `/api/info` | Version, download directory, default connections |
+| GET | `/api/tasks` | Tasks, newest first |
+| POST | `/api/tasks` | Create a task |
+| GET | `/api/tasks/{id}` | One task |
+| DELETE | `/api/tasks/{id}?files=1` | Remove a task; `files=1` removes the file too |
+| POST | `/api/tasks/{id}/pause` | Pause |
+| POST | `/api/tasks/{id}/resume` | Resume or retry |
+| POST | `/api/pause-all` | Pause everything |
+| POST | `/api/resume-all` | Resume everything |
 
-新建任务：
+Creating a task:
 
 ```bash
 TOKEN=$(python3 - <<'PY'
@@ -142,36 +161,40 @@ curl -s http://127.0.0.1:47823/api/tasks \
   }'
 ```
 
-字段：`url`（必填，支持 http/https，缺少 scheme 时补 `https://`）、`fileName`、`dir`、
-`connections`（1–64，默认 32）、`referer`、`userAgent`、`cookie`。
+Fields: `url` (required, http/https, a missing scheme becomes `https://`), `fileName`, `dir`,
+`connections` (1–64, 32 by default), `referer`, `userAgent`, `cookie`.
 
-## 结构
+## Layout
 
 ```
-app.go                 应用生命周期、窗口/菜单/托盘、设置与任务动作
-view.go                原生 UI 视图（列表、详情、设置、新建下载）
-main_test.go           ui.NewTester 视图测试
-internal/download/     任务模型、Range 探测、分片传输、续传元数据、调度器
-internal/store/        JSON 设置与任务持久化（0600、原子写）
-internal/server/       127.0.0.1 HTTP API + Token 鉴权
-locales/               en / zh-Hans 文案与生成的类型安全函数
-extension/             Chromium MV3 扩展（service worker + 设置弹窗），编译时嵌入应用
-resources/             应用图标与托盘图标
+internal/app/          app lifecycle, window, menu, tray, views, settings actions
+internal/download/     task model, Range probing, segmented transfer, resume metadata, scheduler
+internal/store/        JSON settings and task persistence (0600, atomic writes)
+internal/server/       127.0.0.1 HTTP API with token auth
+locales/               en / zh-Hans strings and the generated typed accessors
+extension/             Chromium MV3 extension (service worker + settings popup), embedded at build time
+resources/             app icon and menu bar icon
+docs/                  architecture and motion notes
+main.go                embeds the menu bar icon and starts the app
 ```
 
-下载文件先写成 `<name>.part`，完成后 `fsync` 并原子重命名；同名文件自动变成
-`name (2).ext`。每个任务的分片进度保存在 `<name>.part.segra.json`。
+A download is written to `<name>.part`, then fsynced and renamed into place; a name already taken
+becomes `name (2).ext`. The segment state of each task lives in `<name>.part.segra.json`.
 
-## 说明与限制
+## Notes and limitations
 
-- 仅支持 HTTP(S)，不支持 FTP / BitTorrent；鉴权站点请通过 `cookie` 字段或扩展的 referer 提交。
-- 续传依赖服务器返回稳定的 `ETag` / `Last-Modified` 和文件大小；不一致会从头开始。
-- 令牌保存在 `settings.json`（权限 `0600`）和扩展的 `chrome.storage.local`；
-  删除 `settings.json` 里的 `apiToken` 后重启即可轮换，再在扩展里更新。
-- macOS 首次写入 `~/Downloads` 等受保护目录时，系统会请求“文件与文件夹”权限；
-  未签名的开发二进制可能直接被 TCC 拒绝，打包后的 `.app` 会正常弹出授权。
-- 应用只监听回环地址，不对外暴露端口。
+- HTTP(S) only, no FTP or BitTorrent. For sites that need a login, pass `cookie`, or send the
+  file from the extension with its referrer.
+- Resuming needs a stable `ETag` / `Last-Modified` and file size from the server; when they
+  change, the download starts over.
+- The token is kept in `settings.json` (mode `0600`) and in the extension's
+  `chrome.storage.local`. Delete `apiToken` from `settings.json` and restart to rotate it, then
+  update the extension.
+- The first write to a protected folder such as `~/Downloads` makes macOS ask for Files and
+  Folders access. An unsigned development binary can be refused outright by TCC; the packaged
+  `.app` shows the prompt.
+- The app only listens on the loopback address.
 
-## 许可证
+## License
 
 [GPL-3.0](LICENSE)
