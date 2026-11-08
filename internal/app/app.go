@@ -46,6 +46,9 @@ type App struct {
 	// badge is the count the dock shows already, so that a frame that
 	// changes nothing does not tell the system again.
 	badge int
+	// toast is a message a worker left for the next frame to show, as the
+	// outcome of a dialog that ran off the main thread.
+	toast string
 
 	// seenAt is when each download first showed, so that its row slides in
 	// once rather than every time the list scrolls it back into view.
@@ -359,6 +362,26 @@ func (a *App) finishedAgo(id string) (time.Duration, bool) {
 		return 0, false
 	}
 	return time.Since(at), true
+}
+
+// say leaves message for the next frame to show as a toast. Work that runs
+// off the main thread, as a save dialog does, has no frame to hand, and a
+// toast counts its seconds from the frame that adds it: leaving the words
+// is all it can do, and the view says them with a clock of its own.
+func (a *App) say(message string) {
+	a.mu.Lock()
+	a.toast = message
+	a.mu.Unlock()
+	a.invalidate()
+}
+
+// takeToast takes the message a worker left, if any.
+func (a *App) takeToast() string {
+	a.mu.Lock()
+	message := a.toast
+	a.toast = ""
+	a.mu.Unlock()
+	return message
 }
 
 // flash is how much of the moment a landed download shows: 1 as it lands,

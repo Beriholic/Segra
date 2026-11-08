@@ -87,6 +87,9 @@ func (a *App) buildMenu() {
 		Submenu: []*mygo.MenuItem{
 			{Label: locales.MenuNewDownload(), Accelerator: "CmdOrCtrl+N", Click: func(*mygo.MenuItem, *mygo.Window) { a.openNew() }},
 			{Label: locales.MenuOpenFolder(), Click: func(*mygo.MenuItem, *mygo.Window) { a.openDownloadFolder() }},
+			{Label: locales.MenuExportExtension(), Click: func(*mygo.MenuItem, *mygo.Window) {
+				go a.exportExtension(a.settings.APIPort, a.settings.APIToken)
+			}},
 			mygo.Separator(),
 			{Role: mygo.RoleClose},
 		},

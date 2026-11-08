@@ -744,6 +744,66 @@ func (msgs Messages) PortChanged() string {
 	return Catalog.Format(msgs.locale, "portChanged", nil)
 }
 
+// BrowserExtension says "Browser extension"
+// in the language the app shows.
+func BrowserExtension() string { return In(i18n.Locale()).BrowserExtension() }
+
+// BrowserExtension says "Browser extension"
+// in the language of msgs.
+func (msgs Messages) BrowserExtension() string {
+	return Catalog.Format(msgs.locale, "browserExtension", nil)
+}
+
+// BrowserExtensionHint says "Right-click a link, image or video in the browser to send it here."
+// in the language the app shows.
+func BrowserExtensionHint() string { return In(i18n.Locale()).BrowserExtensionHint() }
+
+// BrowserExtensionHint says "Right-click a link, image or video in the browser to send it here."
+// in the language of msgs.
+func (msgs Messages) BrowserExtensionHint() string {
+	return Catalog.Format(msgs.locale, "browserExtensionHint", nil)
+}
+
+// ExportExtension says "Export extension…"
+// in the language the app shows.
+func ExportExtension() string { return In(i18n.Locale()).ExportExtension() }
+
+// ExportExtension says "Export extension…"
+// in the language of msgs.
+func (msgs Messages) ExportExtension() string {
+	return Catalog.Format(msgs.locale, "exportExtension", nil)
+}
+
+// ExportExtensionTitle says "Save browser extension"
+// in the language the app shows.
+func ExportExtensionTitle() string { return In(i18n.Locale()).ExportExtensionTitle() }
+
+// ExportExtensionTitle says "Save browser extension"
+// in the language of msgs.
+func (msgs Messages) ExportExtensionTitle() string {
+	return Catalog.Format(msgs.locale, "exportExtensionTitle", nil)
+}
+
+// ExtensionInstallHint says "Unzip it, turn on Developer mode in chrome://extensions, then Load unpacked. The exported copy already knows this app…"
+// in the language the app shows.
+func ExtensionInstallHint() string { return In(i18n.Locale()).ExtensionInstallHint() }
+
+// ExtensionInstallHint says "Unzip it, turn on Developer mode in chrome://extensions, then Load unpacked. The exported copy already knows this app…"
+// in the language of msgs.
+func (msgs Messages) ExtensionInstallHint() string {
+	return Catalog.Format(msgs.locale, "extensionInstallHint", nil)
+}
+
+// ExtensionExported says "Extension saved"
+// in the language the app shows.
+func ExtensionExported() string { return In(i18n.Locale()).ExtensionExported() }
+
+// ExtensionExported says "Extension saved"
+// in the language of msgs.
+func (msgs Messages) ExtensionExported() string {
+	return Catalog.Format(msgs.locale, "extensionExported", nil)
+}
+
 // Version says "Version"
 // in the language the app shows.
 func Version() string { return In(i18n.Locale()).Version() }
@@ -1192,4 +1252,14 @@ func Behavior() string { return In(i18n.Locale()).Behavior() }
 // in the language of msgs.
 func (msgs Messages) Behavior() string {
 	return Catalog.Format(msgs.locale, "behavior", nil)
+}
+
+// MenuExportExtension says "Export Browser Extension…"
+// in the language the app shows.
+func MenuExportExtension() string { return In(i18n.Locale()).MenuExportExtension() }
+
+// MenuExportExtension says "Export Browser Extension…"
+// in the language of msgs.
+func (msgs Messages) MenuExportExtension() string {
+	return Catalog.Format(msgs.locale, "menuExportExtension", nil)
 }

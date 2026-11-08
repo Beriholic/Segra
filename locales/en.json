@@ -71,6 +71,12 @@
   "copyToken": "Copy token",
   "copied": "Copied",
   "portChanged": "Port changed. The local API restarted.",
+  "browserExtension": "Browser extension",
+  "browserExtensionHint": "Right-click a link, image or video in the browser to send it here.",
+  "exportExtension": "Export extension…",
+  "exportExtensionTitle": "Save browser extension",
+  "extensionInstallHint": "Unzip it, turn on Developer mode in chrome://extensions, then Load unpacked. The exported copy already knows this app's port and token.",
+  "extensionExported": "Extension saved",
   "version": "Version",
   "about": "About Segra",
   "aboutText": "Segra downloads files in parallel segments and resumes them after a pause or a restart.",
@@ -115,5 +121,6 @@
   "events": "Events",
   "status": "Status",
   "type": "Type",
-  "behavior": "Behavior"
+  "behavior": "Behavior",
+  "menuExportExtension": "Export Browser Extension…"
 }

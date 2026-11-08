@@ -16,10 +16,32 @@ function setStatus(message, isError = false) {
   status.classList.toggle("error", isError);
 }
 
+// readBaked returns the port and token Segra wrote into the copy it
+// exported, or null for a copy loaded from the repository.
+async function readBaked() {
+  try {
+    const response = await fetch(chrome.runtime.getURL("config.json"), { cache: "no-store" });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data && typeof data === "object" ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 async function load() {
   const stored = await chrome.storage.local.get({ port: 47823, token: "" });
-  portInput.value = String(stored.port);
-  tokenInput.value = stored.token;
+  let { port, token } = stored;
+  if (!token) {
+    const baked = await readBaked();
+    if (baked && baked.token) {
+      port = Number(baked.port) || port;
+      token = String(baked.token);
+      await chrome.storage.local.set({ port, token });
+    }
+  }
+  portInput.value = String(port);
+  tokenInput.value = token;
 }
 
 async function save() {

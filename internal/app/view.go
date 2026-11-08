@@ -14,6 +14,11 @@ import (
 func (a *App) viewFn(c *ui.Context) {
 	a.refresh()
 	c.SetTheme(segraTheme())
+	// A worker that saved something says so here, where a toast has the
+	// frame's own clock to count its seconds from.
+	if message := a.takeToast(); message != "" {
+		c.Toast(message)
+	}
 
 	// The window draws no title bar of its own: the strip at the top holds
 	// the traffic lights and drags, and everything else starts at the very

@@ -55,14 +55,21 @@ go tool mygo build -skip-dmg
 
 ## 安装浏览器扩展
 
-1. 启动 Segra，打开 **设置 → 扩展令牌**，点 **复制令牌**。
-2. 打开 `chrome://extensions`（Edge/Arc/Brave 同理），开启 **开发者模式**，点 **加载已解压的扩展程序**，选择本仓库的 `extension/` 目录。
-3. 点扩展的 **选项**，填入端口 `47823` 和刚复制的令牌，点 **测试连接**。
+扩展打包在应用里，不需要仓库也不需要编译：
+
+1. 打开 Segra 的 **设置 → 浏览器扩展**，点 **导出扩展…**，保存 zip。
+2. 解压它。打开 `chrome://extensions`（Edge/Arc/Brave 同理），开启 **开发者模式**，
+   点 **加载已解压的扩展程序**，选择解压出来的文件夹。
+3. 导出的副本里有一份 `config.json`，带着这台机器当前的端口和令牌，装好即可用；
+   要换端口或令牌时在扩展的 **选项** 页里改，点 **测试连接**。
 4. 在网页上右键链接或图片 → **使用 Segra 下载**；或点工具栏图标提交当前页。
    也可以直接在 Segra 里点 **新建下载** 粘贴链接。
 
 > 端口被占用时 Segra 会从 `47823` 开始向后找最多 10 个端口，扩展会自动发现；
 > 也可以在设置里固定端口。
+
+从仓库开发扩展时，直接把 `extension/` 目录当解压后的文件夹加载即可，
+`config.json` 不存在，选项页里手填端口和令牌（设置 → 扩展令牌 → 复制令牌）。
 
 也可以用 `segra://download?url=<编码后的链接>` 深链直接打开新建下载弹窗：
 
@@ -123,7 +130,7 @@ internal/download/     任务模型、Range 探测、分片传输、续传元数
 internal/store/        JSON 设置与任务持久化（0600、原子写）
 internal/server/       127.0.0.1 HTTP API + Token 鉴权
 locales/               en / zh-Hans 文案与生成的类型安全函数
-extension/             Chromium MV3 扩展（service worker + popup + options）
+extension/             Chromium MV3 扩展（service worker + popup + options），编译时嵌入应用
 resources/             应用图标与托盘图标
 ```
 

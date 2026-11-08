@@ -9,12 +9,36 @@ const t = (key, ...subs) => {
   return message || key;
 };
 
+// readBaked returns the port and token Segra wrote into the copy it
+// exported, or null for a copy loaded from the repository.
+async function readBaked() {
+  try {
+    const response = await fetch(chrome.runtime.getURL("config.json"), { cache: "no-store" });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data && typeof data === "object" ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+// getConfig is the settings the user saved, seeded on first use from the
+// config.json of an exported copy, so that loading one needs no setup.
 async function getConfig() {
   const stored = await chrome.storage.local.get({ port: DEFAULT_PORT, token: "" });
-  return {
+  const config = {
     port: Number(stored.port) || DEFAULT_PORT,
     token: String(stored.token || ""),
   };
+  if (!config.token) {
+    const baked = await readBaked();
+    if (baked) {
+      config.port = Number(baked.port) || config.port;
+      config.token = String(baked.token || "");
+      if (config.token) await chrome.storage.local.set(config);
+    }
+  }
+  return config;
 }
 
 async function probe(port) {

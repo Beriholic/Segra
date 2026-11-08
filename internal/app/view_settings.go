@@ -7,6 +7,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
+	"github.com/beriholic/segra/extension"
 	"github.com/beriholic/segra/locales"
 )
 
@@ -76,6 +77,19 @@ func (a *App) settingsView(c *ui.Context) {
 				if !on {
 					body.Opacity(0.45)
 				}
+			})
+
+			card(locales.BrowserExtension(), func() {
+				ui.Text(c, locales.BrowserExtensionHint()).FontSize(11.5).TextColor(colFaint)
+				ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
+					a.secondaryButton(c, locales.ExportExtension(), func() {
+						go a.exportExtension(a.settings.APIPort, a.settings.APIToken)
+					})
+					if v := extension.Version; v != "" {
+						ui.Text(c, "v"+v).FontSize(11).TextColor(colFaint)
+					}
+				})
+				ui.Text(c, locales.ExtensionInstallHint()).FontSize(11).TextColor(colFaint)
 			})
 
 			card(locales.Language(), func() {
