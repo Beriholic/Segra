@@ -65,8 +65,11 @@ func (m *Manager) Pause(id string) {
 		t.Status = StatusPaused
 		cancel = m.running[id]
 		// Free the slot now: the cancelled worker may take a moment to
-		// unwind, and a queued download should not wait for it.
+		// unwind, and a queued download should not wait for it. The task
+		// itself does wait, though, so that the worker that is still
+		// renaming its .part file cannot meet a second one doing the same.
 		delete(m.running, id)
+		m.draining[id] = true
 	case StatusQueued:
 		t.Status = StatusPaused
 		m.removeFromQueue(id)
@@ -116,6 +119,7 @@ func (m *Manager) PauseAll() {
 			if c := m.running[t.ID]; c != nil {
 				cancels = append(cancels, c)
 				delete(m.running, t.ID)
+				m.draining[t.ID] = true
 			}
 		case StatusQueued:
 			t.Status = StatusPaused

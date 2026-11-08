@@ -34,8 +34,18 @@ func (m *Manager) pump() {
 	}
 	started := 0
 	for len(m.queue) > 0 && len(m.running) < m.cfg.MaxConcurrent {
-		id := m.queue[0]
-		m.queue = m.queue[1:]
+		// A task whose cancelled worker is still unwinding keeps its place
+		// in the queue: it starts again when that worker has returned, and
+		// the downloads behind it go ahead meanwhile.
+		i := 0
+		for i < len(m.queue) && m.draining[m.queue[i]] {
+			i++
+		}
+		if i == len(m.queue) {
+			break
+		}
+		id := m.queue[i]
+		m.queue = append(m.queue[:i], m.queue[i+1:]...)
 		t := m.tasks[id]
 		if t == nil || t.Status != StatusQueued {
 			continue
@@ -62,6 +72,7 @@ func (m *Manager) run(ctx context.Context, t *Task) {
 	defer func() {
 		m.mu.Lock()
 		delete(m.running, t.ID)
+		delete(m.draining, t.ID)
 		m.mu.Unlock()
 		m.changed()
 		m.wake()

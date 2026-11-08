@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -734,6 +735,15 @@ func TestResumeRefreshesSignedURL(t *testing.T) {
 	payload := bytes.Repeat([]byte("s"), 512*1024)
 	var token atomic.Int32
 	token.Store(1)
+	// The first chunk of every range goes out, then the connection waits for
+	// the test: a download that can finish before the pause proves nothing
+	// about resuming one.
+	var hold atomic.Bool
+	hold.Store(true)
+	gate := make(chan struct{})
+	var gateOnce sync.Once
+	openGate := func() { gateOnce.Do(func() { close(gate) }) }
+	defer openGate()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/file.bin" {
 			http.Redirect(w, r, fmt.Sprintf("/cdn/file.bin?token=%d", token.Load()), http.StatusFound)
@@ -755,6 +765,22 @@ func TestResumeRefreshesSignedURL(t *testing.T) {
 		w.WriteHeader(http.StatusPartialContent)
 		chunk := payload[start : end+1]
 		flusher, _ := w.(http.Flusher)
+		if n := min(4096, len(chunk)); n > 0 {
+			if _, err := w.Write(chunk[:n]); err != nil {
+				return
+			}
+			chunk = chunk[n:]
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if hold.Load() {
+			select {
+			case <-gate:
+			case <-r.Context().Done():
+				return
+			}
+		}
 		for len(chunk) > 0 {
 			n := min(4096, len(chunk))
 			if _, err := w.Write(chunk[:n]); err != nil {
@@ -787,6 +813,8 @@ func TestResumeRefreshesSignedURL(t *testing.T) {
 	waitStatus(t, m, task.ID, StatusPaused, 5*time.Second)
 
 	// The link in the .part file is now dead; only a fresh probe helps.
+	hold.Store(false)
+	openGate()
 	token.Store(2)
 	m.Resume(task.ID)
 	waitStatus(t, m, task.ID, StatusCompleted, 20*time.Second)

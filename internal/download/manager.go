@@ -14,10 +14,14 @@ type Manager struct {
 	order   []string
 	queue   []string
 	running map[string]context.CancelFunc
-	cfg     Config
-	client  *http.Client
-	notify  func()
-	onEvent func(Event)
+	// draining holds the tasks whose cancelled worker has not returned yet.
+	// They keep no slot in running, so that a queued download goes ahead,
+	// but they cannot start again until the old worker is off their file.
+	draining map[string]bool
+	cfg      Config
+	client   *http.Client
+	notify   func()
+	onEvent  func(Event)
 
 	wakeCh   chan struct{}
 	stop     chan struct{}
@@ -33,13 +37,14 @@ func New(client *http.Client, cfg Config, notify func()) *Manager {
 		client = &http.Client{}
 	}
 	m := &Manager{
-		tasks:   make(map[string]*Task),
-		running: make(map[string]context.CancelFunc),
-		cfg:     cfg.withDefaults(),
-		client:  separateConnections(client),
-		notify:  notify,
-		wakeCh:  make(chan struct{}, 1),
-		stop:    make(chan struct{}),
+		tasks:    make(map[string]*Task),
+		running:  make(map[string]context.CancelFunc),
+		draining: make(map[string]bool),
+		cfg:      cfg.withDefaults(),
+		client:   separateConnections(client),
+		notify:   notify,
+		wakeCh:   make(chan struct{}, 1),
+		stop:     make(chan struct{}),
 	}
 	go m.loop()
 	return m
