@@ -1,0 +1,120 @@
+# A tag is a release: every platform builds from it, and the artifacts of
+# all three land in one GitHub release. macOS is signed ad hoc, not
+# notarized, so the first launch there needs Open from the context menu.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go tool mygo vet .
+      - run: CGO_ENABLED=0 go test ./...
+
+  build:
+    needs: test
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # mygo builds and signs the .app and writes the disk image on
+          # macOS only; the binary itself cross-compiles anywhere.
+          - name: macOS (universal)
+            os: macos-14
+            platform: darwin/universal
+            target: darwin-universal
+          - name: Windows (amd64)
+            os: windows-latest
+            platform: windows/amd64
+            target: windows-amd64
+          - name: Linux (amd64)
+            os: ubuntu-latest
+            platform: linux/amd64
+            target: linux-amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The tag is the version: the app, the bundle and every file name
+      # read it from mygo.json, which mygo build links into the binary.
+      - name: Number the build from the tag
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::tag $GITHUB_REF_NAME is not v<major>.<minor>.<patch>"
+            exit 1
+          fi
+          VERSION="$version" node -e '
+            const fs = require("fs");
+            const path = "mygo.json";
+            const config = JSON.parse(fs.readFileSync(path, "utf8"));
+            config.version = process.env.VERSION;
+            fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
+          '
+          echo "Building $version"
+
+      - run: go tool mygo build -platform ${{ matrix.platform }} -skip-notarize
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: build/${{ matrix.target }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # Each platform keeps its own directory: the resource files inside
+      # them share names, and only the packages are published.
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      # A re-run of the same tag adds to the release it made the first
+      # time rather than failing on it.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          assets=(dist/*/*.dmg dist/*/*setup*.exe dist/*/*.deb dist/*/*.tar.gz)
+          for asset in "${assets[@]}"; do
+            if [ ! -f "$asset" ]; then
+              echo "::error::nothing to publish as $asset"
+              exit 1
+            fi
+          done
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" \
+              --generate-notes
+          fi

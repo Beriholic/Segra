@@ -54,6 +54,26 @@ go tool mygo build -skip-dmg
 
 应用名、标识符、版本、图标、`segra://` URL scheme、i18n 目录都在 `mygo.json` 里配置。
 
+## 发布
+
+推一个 `v` 开头的 tag 就会触发 `.github/workflows/release.yml`：三个平台并行构建，
+产物一起挂到同一个 GitHub Release，不需要任何 secret。
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+| 平台 | 产物 |
+| --- | --- |
+| macOS（universal） | `segra-<version>.dmg` |
+| Windows（amd64） | `segra-setup-<version>-amd64.exe`（NSIS 安装包） |
+| Linux（amd64） | `segra_<version>_amd64.deb`、`segra-<version>-linux-amd64.tar.gz`、`PKGBUILD` |
+
+版本号取自 tag：CI 先把 tag 写进 `mygo.json` 再构建，所以仓库里的 `version`
+不用跟着手动改。macOS 只做 ad-hoc 签名、不做公证，别人第一次打开要在 Finder 里
+右键 → 打开，或者 `xattr -d com.apple.quarantine /Applications/Segra.app`。
+
 ## 安装浏览器扩展
 
 扩展打包在应用里，不需要仓库也不需要编译：

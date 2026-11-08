@@ -23,7 +23,8 @@ var trayIcon []byte
 func Run(tray []byte) {
 	trayIcon = tray
 	mygo.App.SetName("Segra")
-	mygo.App.SetVersion("0.1.0")
+	// The version is the one in mygo.json, which mygo build links into the
+	// binary and the bundle, so a release is numbered in one place.
 
 	if !mygo.App.RequestSingleInstanceLock() {
 		return
