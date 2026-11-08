@@ -24,6 +24,17 @@ const (
 	panelGap     = 10
 	panelTaskGap = 12
 	panelMaxRows = 3
+
+	// The footer's buttons take the width the panel gives them, not the
+	// width of their labels: native UI measures text with the system's own
+	// font, which reads the same words a few points wider on one platform
+	// than another, and a wider font must not push the last button out of
+	// the flyout. The three add up to less than panelWidth-2*panelPad, and
+	// a label that does not fit ellipsizes.
+	panelActionGap = 6
+	panelPauseW    = 84
+	panelResumeW   = 92
+	panelOpenW     = 97
 )
 
 // panelHeight is the height the panel needs to list n downloads.
@@ -285,14 +296,13 @@ func panelMeta(t download.Task) string {
 }
 
 func (a *App) panelActions(c *ui.Context, running bool) {
-	ui.Row(c).Height(28).AlignItems(ui.Center).Gap(8).Children(func() {
-		pause := a.panelButton(c, locales.PauseAll(), false, func() { a.mgr.PauseAll() })
+	ui.Row(c).Height(28).AlignItems(ui.Center).Gap(panelActionGap).Children(func() {
+		pause := a.panelButton(c, locales.PauseAll(), panelPauseW, false, func() { a.mgr.PauseAll() })
 		if !running {
 			pause.Disabled(true).Opacity(0.5)
 		}
-		a.panelButton(c, locales.ResumeAll(), false, func() { a.mgr.ResumeAll() })
-		ui.Spacer(c)
-		a.panelButton(c, locales.TrayOpen(), true, func() {
+		a.panelButton(c, locales.ResumeAll(), panelResumeW, false, func() { a.mgr.ResumeAll() })
+		a.panelButton(c, locales.TrayOpen(), panelOpenW, true, func() {
 			a.showWindow()
 			a.closePanel()
 		})
@@ -300,9 +310,10 @@ func (a *App) panelActions(c *ui.Context, running bool) {
 }
 
 // panelButton is a button of the panel's footer: a pill with tighter padding
-// than a window's, so that three of them fit the width of the panel.
-func (a *App) panelButton(c *ui.Context, label string, primary bool, fn func()) ui.Element {
-	return a.pillButton(c, label, nil, primary, fn).Height(28).Radius(14).Padding(0, 10)
+// than a window's, and a width of its own rather than its label's, so that
+// three of them fit the panel whatever the system's font makes of the words.
+func (a *App) panelButton(c *ui.Context, label string, width float32, primary bool, fn func()) ui.Element {
+	return a.pillButton(c, label, nil, primary, fn).Width(width).Height(28).Radius(14).Padding(0, 10)
 }
 
 // focusTask brings the window up on the download the user picked.

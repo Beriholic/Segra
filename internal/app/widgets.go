@@ -32,7 +32,9 @@ func (a *App) pillButton(c *ui.Context, label string, icon *ui.SVG, primary bool
 			}
 			ui.Icon(c, icon).FontSize(13).TextColor(iconColor)
 		}
-		text := ui.Text(c, label).FontSize(12.5).SingleLine()
+		// A button may be narrower than its label asks for, as the panel's
+		// footer is: the label gives way rather than growing the pill.
+		text := ui.Text(c, label).FontSize(12.5).SingleLine().Ellipsis("…")
 		if primary {
 			text = text.Bold().TextColor(ui.RGB(0xFF, 0xFF, 0xFF))
 		} else {
