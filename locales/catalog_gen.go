@@ -944,6 +944,16 @@ func (msgs Messages) TrayQuit() string {
 	return Catalog.Format(msgs.locale, "trayQuit", nil)
 }
 
+// PanelIdle says "No active downloads"
+// in the language the app shows.
+func PanelIdle() string { return In(i18n.Locale()).PanelIdle() }
+
+// PanelIdle says "No active downloads"
+// in the language of msgs.
+func (msgs Messages) PanelIdle() string {
+	return Catalog.Format(msgs.locale, "panelIdle", nil)
+}
+
 // NotifCompleted says "Download complete"
 // in the language the app shows.
 func NotifCompleted() string { return In(i18n.Locale()).NotifCompleted() }

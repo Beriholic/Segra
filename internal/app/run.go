@@ -117,25 +117,48 @@ func (a *App) buildMenu() {
 	}
 }
 
+// createTray adds the menu bar icon, which shows how far the downloads are and
+// opens the panel below it. Linux's tray icons show menus and tell nothing of
+// clicks, so there the icon keeps a menu.
 func (a *App) createTray() {
 	tray, err := mygo.NewTray(mygo.TrayOptions{
 		ID:             "segra",
 		Icon:           trayIcon,
 		IconIsTemplate: true,
 		ToolTip:        "Segra",
-		Menu: mygo.NewMenu([]*mygo.MenuItem{
-			{Label: locales.TrayOpen(), Click: func(*mygo.MenuItem, *mygo.Window) { a.showWindow() }},
-			mygo.Separator(),
-			{Label: locales.TrayPauseAll(), Click: func(*mygo.MenuItem, *mygo.Window) { a.mgr.PauseAll() }},
-			{Label: locales.TrayResumeAll(), Click: func(*mygo.MenuItem, *mygo.Window) { a.mgr.ResumeAll() }},
-			mygo.Separator(),
-			{Role: mygo.RoleQuit, Label: locales.TrayQuit()},
-		}),
 	})
 	if err != nil {
 		log.Printf("tray: %v", err)
 		return
 	}
+	a.mu.Lock()
 	a.tray = tray
-	tray.OnClick(a.showWindow)
+	a.mu.Unlock()
+
+	if runtime.GOOS == "linux" {
+		tray.SetMenu(a.trayMenu())
+		return
+	}
+	tray.OnClick(a.togglePanel)
+	tray.OnRightClick(func() {
+		a.closePanel()
+		// The menu is the icon's only for this popup, so that a click on the
+		// icon keeps toggling the panel.
+		tray.SetMenu(a.trayMenu())
+		defer tray.SetMenu(nil)
+		tray.PopUpMenu()
+	})
+	a.updateTrayStatus(a.mgr.List())
+}
+
+// trayMenu is the icon's menu: the actions of the panel, for a right click.
+func (a *App) trayMenu() *mygo.Menu {
+	return mygo.NewMenu([]*mygo.MenuItem{
+		{Label: locales.TrayOpen(), Click: func(*mygo.MenuItem, *mygo.Window) { a.showWindow() }},
+		mygo.Separator(),
+		{Label: locales.TrayPauseAll(), Click: func(*mygo.MenuItem, *mygo.Window) { a.mgr.PauseAll() }},
+		{Label: locales.TrayResumeAll(), Click: func(*mygo.MenuItem, *mygo.Window) { a.mgr.ResumeAll() }},
+		mygo.Separator(),
+		{Role: mygo.RoleQuit, Label: locales.TrayQuit()},
+	})
 }

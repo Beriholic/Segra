@@ -91,6 +91,7 @@
   "trayPauseAll": "全部暂停",
   "trayResumeAll": "全部继续",
   "trayQuit": "退出 Segra",
+  "panelIdle": "没有正在下载的任务",
   "notifCompleted": "下载完成",
   "notifFailed": "下载失败",
   "urlRequired": "请输入要下载的链接。",

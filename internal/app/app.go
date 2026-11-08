@@ -34,6 +34,15 @@ type App struct {
 	quitting bool
 	paused   bool
 
+	// panel is the menu bar panel while it shows, and panelRows the number
+	// of downloads it lists: a download that starts or finishes resizes it.
+	panel     *mygo.Window
+	panelRows int
+	// trayTitle and trayTip are what the icon says already, so that the
+	// second the downloads do not change says nothing to the system.
+	trayTitle string
+	trayTip   string
+
 	tasks    []download.Task
 	rows     []download.Task
 	list     ui.ListState
@@ -265,8 +274,9 @@ func (a *App) sampleSpeeds(stop chan struct{}) {
 		case <-stop:
 			return
 		case <-ticker.C:
+			tasks := a.mgr.List()
 			var total float64
-			for _, t := range a.mgr.List() {
+			for _, t := range tasks {
 				if t.Status == download.StatusDownloading {
 					total += float64(t.Speed)
 				}
@@ -277,6 +287,7 @@ func (a *App) sampleSpeeds(stop chan struct{}) {
 				a.speedSamples = a.speedSamples[len(a.speedSamples)-sparkSlots:]
 			}
 			a.speedMu.Unlock()
+			a.updateTrayStatus(tasks)
 		}
 	}
 }

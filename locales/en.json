@@ -91,6 +91,7 @@
   "trayPauseAll": "Pause All",
   "trayResumeAll": "Resume All",
   "trayQuit": "Quit Segra",
+  "panelIdle": "No active downloads",
   "notifCompleted": "Download complete",
   "notifFailed": "Download failed",
   "urlRequired": "Enter a link to download.",
