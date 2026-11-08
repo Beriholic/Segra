@@ -38,9 +38,11 @@ jobs:
       matrix:
         include:
           # mygo builds and signs the .app and writes the disk image on
-          # macOS only; the binary itself cross-compiles anywhere.
+          # macOS only; the binary itself cross-compiles anywhere. macos-14
+          # resolves to an arm64 runner configuration this account cannot
+          # use, macos-15 is the image that does.
           - name: macOS (universal)
-            os: macos-14
+            os: macos-15
             platform: darwin/universal
             target: darwin-universal
           - name: Windows (amd64)
