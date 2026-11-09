@@ -44,6 +44,7 @@ func (a *App) viewFn(c *ui.Context) {
 		})
 		a.statusBar(c)
 		a.newDialog(c)
+		a.updateDialog(c)
 		ui.Box(c).Absolute().Left(0).Right(0).Top(0).Height(strip).DragWindow()
 	})
 }
@@ -69,7 +70,7 @@ func (a *App) sidebar(c *ui.Context, strip float32) {
 			a.sectionLabel(c, locales.Settings())
 			ui.Box(c).Height(2)
 			a.navGroup(c, []navEntry{
-				{id: "settings", icon: icSettings, label: locales.General()},
+				{id: "settings", icon: icSettings, label: locales.General(), dot: a.updateAvailable()},
 			})
 			ui.Spacer(c)
 		})
@@ -85,6 +86,9 @@ type navEntry struct {
 	icon  *ui.SVG
 	label string
 	count int
+	// dot marks a place with news, as Settings has when a release is
+	// waiting.
+	dot bool
 }
 
 // navGroup lays its items out over one highlight that slides between them,
@@ -144,6 +148,9 @@ func (a *App) navItem(c *ui.Context, it navEntry) {
 		text := ui.Text(c, it.label).FontSize(13).SingleLine().Grow(1).TextColor(textColor)
 		if selected {
 			text.Bold()
+		}
+		if it.dot {
+			ui.Box(c).Size(6, 6).Radius(3).Background(colGreen)
 		}
 		if it.count > 0 {
 			ui.Box(c).Padding(1, 6).Radius(6).Background(colPill).Children(func() {

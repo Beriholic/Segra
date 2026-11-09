@@ -1263,3 +1263,203 @@ func MenuExportExtension() string { return In(i18n.Locale()).MenuExportExtension
 func (msgs Messages) MenuExportExtension() string {
 	return Catalog.Format(msgs.locale, "menuExportExtension", nil)
 }
+
+// Updates says "Updates"
+// in the language the app shows.
+func Updates() string { return In(i18n.Locale()).Updates() }
+
+// Updates says "Updates"
+// in the language of msgs.
+func (msgs Messages) Updates() string {
+	return Catalog.Format(msgs.locale, "updates", nil)
+}
+
+// CheckUpdates says "Check for updates"
+// in the language the app shows.
+func CheckUpdates() string { return In(i18n.Locale()).CheckUpdates() }
+
+// CheckUpdates says "Check for updates"
+// in the language of msgs.
+func (msgs Messages) CheckUpdates() string {
+	return Catalog.Format(msgs.locale, "checkUpdates", nil)
+}
+
+// CheckUpdatesHint says "Look for a newer release on GitHub when Segra starts."
+// in the language the app shows.
+func CheckUpdatesHint() string { return In(i18n.Locale()).CheckUpdatesHint() }
+
+// CheckUpdatesHint says "Look for a newer release on GitHub when Segra starts."
+// in the language of msgs.
+func (msgs Messages) CheckUpdatesHint() string {
+	return Catalog.Format(msgs.locale, "checkUpdatesHint", nil)
+}
+
+// CheckNow says "Check Now"
+// in the language the app shows.
+func CheckNow() string { return In(i18n.Locale()).CheckNow() }
+
+// CheckNow says "Check Now"
+// in the language of msgs.
+func (msgs Messages) CheckNow() string {
+	return Catalog.Format(msgs.locale, "checkNow", nil)
+}
+
+// CheckingUpdates says "Checking for updates…"
+// in the language the app shows.
+func CheckingUpdates() string { return In(i18n.Locale()).CheckingUpdates() }
+
+// CheckingUpdates says "Checking for updates…"
+// in the language of msgs.
+func (msgs Messages) CheckingUpdates() string {
+	return Catalog.Format(msgs.locale, "checkingUpdates", nil)
+}
+
+// UpdateNotChecked says "Check GitHub for a new release."
+// in the language the app shows.
+func UpdateNotChecked() string { return In(i18n.Locale()).UpdateNotChecked() }
+
+// UpdateNotChecked says "Check GitHub for a new release."
+// in the language of msgs.
+func (msgs Messages) UpdateNotChecked() string {
+	return Catalog.Format(msgs.locale, "updateNotChecked", nil)
+}
+
+// UpToDate says "You're on the latest version."
+// in the language the app shows.
+func UpToDate() string { return In(i18n.Locale()).UpToDate() }
+
+// UpToDate says "You're on the latest version."
+// in the language of msgs.
+func (msgs Messages) UpToDate() string {
+	return Catalog.Format(msgs.locale, "upToDate", nil)
+}
+
+// UpdateAvailableMsg says "Version %s is available — you have %s."
+// in the language the app shows.
+func UpdateAvailableMsg() string { return In(i18n.Locale()).UpdateAvailableMsg() }
+
+// UpdateAvailableMsg says "Version %s is available — you have %s."
+// in the language of msgs.
+func (msgs Messages) UpdateAvailableMsg() string {
+	return Catalog.Format(msgs.locale, "updateAvailableMsg", nil)
+}
+
+// DevBuild says "Development build"
+// in the language the app shows.
+func DevBuild() string { return In(i18n.Locale()).DevBuild() }
+
+// DevBuild says "Development build"
+// in the language of msgs.
+func (msgs Messages) DevBuild() string {
+	return Catalog.Format(msgs.locale, "devBuild", nil)
+}
+
+// UpdateCheckFailed says "Couldn't check for updates."
+// in the language the app shows.
+func UpdateCheckFailed() string { return In(i18n.Locale()).UpdateCheckFailed() }
+
+// UpdateCheckFailed says "Couldn't check for updates."
+// in the language of msgs.
+func (msgs Messages) UpdateCheckFailed() string {
+	return Catalog.Format(msgs.locale, "updateCheckFailed", nil)
+}
+
+// UpdateAvailableTitle says "Update available"
+// in the language the app shows.
+func UpdateAvailableTitle() string { return In(i18n.Locale()).UpdateAvailableTitle() }
+
+// UpdateAvailableTitle says "Update available"
+// in the language of msgs.
+func (msgs Messages) UpdateAvailableTitle() string {
+	return Catalog.Format(msgs.locale, "updateAvailableTitle", nil)
+}
+
+// UpdateReadyMsg says "Segra %s is available. You have %s."
+// in the language the app shows.
+func UpdateReadyMsg() string { return In(i18n.Locale()).UpdateReadyMsg() }
+
+// UpdateReadyMsg says "Segra %s is available. You have %s."
+// in the language of msgs.
+func (msgs Messages) UpdateReadyMsg() string {
+	return Catalog.Format(msgs.locale, "updateReadyMsg", nil)
+}
+
+// UpdateNotesHint says "See the release page for what changed."
+// in the language the app shows.
+func UpdateNotesHint() string { return In(i18n.Locale()).UpdateNotesHint() }
+
+// UpdateNotesHint says "See the release page for what changed."
+// in the language of msgs.
+func (msgs Messages) UpdateNotesHint() string {
+	return Catalog.Format(msgs.locale, "updateNotesHint", nil)
+}
+
+// DownloadUpdate says "Download Update"
+// in the language the app shows.
+func DownloadUpdate() string { return In(i18n.Locale()).DownloadUpdate() }
+
+// DownloadUpdate says "Download Update"
+// in the language of msgs.
+func (msgs Messages) DownloadUpdate() string {
+	return Catalog.Format(msgs.locale, "downloadUpdate", nil)
+}
+
+// WhatsNew says "Release Notes"
+// in the language the app shows.
+func WhatsNew() string { return In(i18n.Locale()).WhatsNew() }
+
+// WhatsNew says "Release Notes"
+// in the language of msgs.
+func (msgs Messages) WhatsNew() string {
+	return Catalog.Format(msgs.locale, "whatsNew", nil)
+}
+
+// Later says "Later"
+// in the language the app shows.
+func Later() string { return In(i18n.Locale()).Later() }
+
+// Later says "Later"
+// in the language of msgs.
+func (msgs Messages) Later() string {
+	return Catalog.Format(msgs.locale, "later", nil)
+}
+
+// NotifUpdate says "Update available"
+// in the language the app shows.
+func NotifUpdate() string { return In(i18n.Locale()).NotifUpdate() }
+
+// NotifUpdate says "Update available"
+// in the language of msgs.
+func (msgs Messages) NotifUpdate() string {
+	return Catalog.Format(msgs.locale, "notifUpdate", nil)
+}
+
+// NotifUpdateBody says "Segra %s is ready to download."
+// in the language the app shows.
+func NotifUpdateBody() string { return In(i18n.Locale()).NotifUpdateBody() }
+
+// NotifUpdateBody says "Segra %s is ready to download."
+// in the language of msgs.
+func (msgs Messages) NotifUpdateBody() string {
+	return Catalog.Format(msgs.locale, "notifUpdateBody", nil)
+}
+
+// MenuCheckUpdates says "Check for Updates…"
+// in the language the app shows.
+func MenuCheckUpdates() string { return In(i18n.Locale()).MenuCheckUpdates() }
+
+// MenuCheckUpdates says "Check for Updates…"
+// in the language of msgs.
+func (msgs Messages) MenuCheckUpdates() string {
+	return Catalog.Format(msgs.locale, "menuCheckUpdates", nil)
+}
+
+// OpenLinkFailed says "Couldn't open the link."
+// in the language the app shows.
+func OpenLinkFailed() string { return In(i18n.Locale()).OpenLinkFailed() }
+
+// OpenLinkFailed says "Couldn't open the link."
+// in the language of msgs.
+func (msgs Messages) OpenLinkFailed() string {
+	return Catalog.Format(msgs.locale, "openLinkFailed", nil)
+}

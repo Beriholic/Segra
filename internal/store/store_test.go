@@ -34,6 +34,24 @@ func TestDefaultSettingsClipboardFillIsOptIn(t *testing.T) {
 	}
 }
 
+// A settings file from before update checks existed still checks for
+// updates: the defaults fill what the file does not name.
+func TestCheckUpdatesDefaultsOn(t *testing.T) {
+	dir := t.TempDir()
+	old := `{"downloadDir":"/tmp","connections":4,"maxConcurrent":3,"apiPort":47823}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := Open(dir)
+	got, err := s.LoadSettings(DefaultSettings("/tmp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.CheckUpdates {
+		t.Fatal("update checks are off for a settings file without the field")
+	}
+}
+
 func TestLoadSettingsKeepsCustomConnections(t *testing.T) {
 	dir := t.TempDir()
 	old := `{"downloadDir":"/tmp","connections":4,"maxConcurrent":3,"apiPort":47823}`

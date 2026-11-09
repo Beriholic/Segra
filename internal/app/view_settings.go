@@ -142,6 +142,29 @@ func (a *App) settingsView(c *ui.Context) {
 				}
 			})
 
+			card(locales.Updates(), func() {
+				a.switchRow(c, locales.CheckUpdates(), locales.CheckUpdatesHint(), &a.settings.CheckUpdates)
+				snapshot := a.snapshotUpdate()
+				label, color := updateStatus(snapshot)
+				ui.Row(c).FillWidth().Gap(10).AlignItems(ui.Center).Children(func() {
+					status := ui.Text(c, label).FontSize(11.5).TextColor(color).Grow(1).SingleLine().Ellipsis("…")
+					if snapshot.Err != "" {
+						status.Tooltip(snapshot.Err)
+					}
+					check := a.secondaryButton(c, locales.CheckNow(), func() { a.requestUpdateCheck(true) })
+					if snapshot.Checking {
+						check.Disabled(true)
+						check.Opacity(0.6)
+					}
+				})
+				if snapshot.Result != nil && snapshot.Result.Newer {
+					ui.Row(c).Gap(8).Children(func() {
+						a.primaryButton(c, locales.DownloadUpdate(), a.downloadUpdate)
+						a.secondaryButton(c, locales.WhatsNew(), a.openUpdateDialog)
+					})
+				}
+			})
+
 			ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 				// There is no Save button: every control writes its setting
 				// down as it changes, and the line says so where the button

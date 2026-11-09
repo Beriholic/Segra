@@ -30,6 +30,9 @@ video to the desktop app from the context menu.
   Ports are discovered automatically and the API wants a Bearer token.
 - **Desktop integration** — single instance, menu bar tray, system notifications, close to tray,
   open at login, Dock badge.
+- **Update check** — asks GitHub for a newer release at launch and once a day after that, and
+  from Help → Check for Updates. It links the installer of the running platform; it does not
+  replace the app behind your back. Settings → Updates turns the automatic check off.
 - **Local API** — bound to `127.0.0.1`, for scripts and other clients.
 - **System proxy** — through `mygo/netproxy`, following the system settings.
 

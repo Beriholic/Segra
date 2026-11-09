@@ -99,6 +99,8 @@ func (a *App) buildMenu() {
 	help := &mygo.MenuItem{
 		Label: locales.MenuHelp(),
 		Submenu: []*mygo.MenuItem{
+			{Label: locales.MenuCheckUpdates(), Click: func(*mygo.MenuItem, *mygo.Window) { a.requestUpdateCheck(true) }},
+			mygo.Separator(),
 			{Label: locales.MenuAbout(), Click: func(*mygo.MenuItem, *mygo.Window) {
 				mygo.App.ShowAboutPanel(mygo.AboutPanelOptions{ApplicationName: "Segra", ApplicationVersion: mygo.App.Version()})
 			}},

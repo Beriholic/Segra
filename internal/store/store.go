@@ -30,6 +30,12 @@ type Settings struct {
 	OpenAtLogin   bool   `json:"openAtLogin"`
 	CloseToTray   bool   `json:"closeToTray"`
 	HideDock      bool   `json:"hideDock"` // macOS: no Dock icon once the window closes
+
+	// CheckUpdates asks GitHub for a newer release when the app starts.
+	// UpdateCheckedAt is when a check last found nothing newer, in Unix
+	// seconds, so that a relaunch within a day does not ask again.
+	CheckUpdates    bool  `json:"checkUpdates"`
+	UpdateCheckedAt int64 `json:"updateCheckedAt,omitempty"`
 }
 
 // DefaultSettings returns settings for a first run.
@@ -48,6 +54,7 @@ func DefaultSettings(downloadDir string) Settings {
 		OpenAtLogin:   false,
 		CloseToTray:   false,
 		HideDock:      false,
+		CheckUpdates:  true,
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/beriholic/segra/internal/download"
 	"github.com/beriholic/segra/internal/server"
 	"github.com/beriholic/segra/internal/store"
+	"github.com/beriholic/segra/internal/update"
 	"github.com/beriholic/segra/locales"
 )
 
@@ -53,6 +54,26 @@ type App struct {
 	// The switch writes a.settings as it flips, so nothing else remembers
 	// the value the system has.
 	loginSaved bool
+
+	// updateMu guards the result of the last release check, which a worker
+	// writes and the view reads. updateClient is what that worker asks
+	// GitHub with, and nil in tests, which never start a check.
+	updateMu     sync.Mutex
+	updating     bool
+	updateResult *update.Result
+	updateErr    string
+	updateClient *http.Client
+
+	// updateOpen shows the release dialog, and updateRun replays its
+	// entrance when it opens again. Both are the view's, on the main
+	// thread.
+	updateOpen bool
+	updateRun  uint64
+	// notifiedUpdate is the release the user was told about already, so
+	// that the daily check does not repeat the same notification.
+	notifiedUpdate string
+	// updateStop ends the daily check when the app quits.
+	updateStop chan struct{}
 
 	// seenAt is when each download first showed, so that its row slides in
 	// once rather than every time the list scrolls it back into view.
@@ -149,6 +170,10 @@ func (a *App) start() {
 	transport.ResponseHeaderTimeout = 30 * time.Second
 	transport.ExpectContinueTimeout = time.Second
 	client := &http.Client{Transport: transport}
+	// Release checks share the proxy-aware transport but not the
+	// downloader's patience: a check that hangs would leave the settings
+	// saying it is still looking.
+	a.updateClient = &http.Client{Transport: transport, Timeout: updateTimeout}
 	a.mgr = download.New(client, download.Config{
 		Dir:           a.settings.DownloadDir,
 		Connections:   a.settings.Connections,
@@ -197,6 +222,8 @@ func (a *App) start() {
 
 	a.sampleStop = make(chan struct{})
 	go a.sampleSpeeds(a.sampleStop)
+	a.updateStop = make(chan struct{})
+	go a.watchUpdates(a.updateStop)
 
 	win := mygo.NewWindow(mygo.WindowOptions{
 		Title:         "Segra",
@@ -234,6 +261,10 @@ func (a *App) start() {
 		a.buildMenu()
 		win.SetTitle("Segra")
 	})
+
+	// The window is up by now, so a release found at launch has somewhere
+	// to say so. The check runs off the main thread.
+	a.maybeCheckUpdates()
 }
 
 // shutdown persists state and stops the background workers.
@@ -242,6 +273,10 @@ func (a *App) shutdown() {
 	if a.sampleStop != nil {
 		close(a.sampleStop)
 		a.sampleStop = nil
+	}
+	if a.updateStop != nil {
+		close(a.updateStop)
+		a.updateStop = nil
 	}
 	if a.srv != nil {
 		_ = a.srv.Stop()

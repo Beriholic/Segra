@@ -25,6 +25,8 @@ Segra 是单一 Go 二进制：根目录只留一个 `main.go` 负责启动，�
 │   │   ├── view_inspector.go 任务详情面板（含折叠动画）
 │   │   ├── view_settings.go  设置页
 │   │   ├── view_dialog.go    新建下载弹窗
+│   │   ├── update.go         检查更新：GitHub release、通知、打开下载页
+│   │   ├── view_update.go    更新状态行与版本弹窗
 │   │   ├── format.go         纯函数：字节/速度/时长/百分比/状态文案
 │   │   ├── icons.go          图标注册与按扩展名选图标
 │   │   ├── icons/            Lucide SVG（ISC）
@@ -40,6 +42,7 @@ Segra 是单一 Go 二进制：根目录只留一个 `main.go` 负责启动，�
 │   │   ├── filename.go           文件名推断与清洗
 │   │   └── task.go               Task / Status 模型
 │   ├── server/               127.0.0.1 上的本地 HTTP API
+│   ├── update/               GitHub Release 查询与版本比较
 │   └── store/                settings.json / tasks.json 的原子读写
 ├── locales/                  中英文目录与生成的访问器
 ├── resources/                icon.png（打包图标，mygo.json 引用）与 tray.png（菜单栏）
@@ -52,11 +55,14 @@ Segra 是单一 Go 二进制：根目录只留一个 `main.go` 负责启动，�
 ```
 main.go ──▶ internal/app ──┬─▶ internal/download
                            ├─▶ internal/store
-                           └─▶ internal/server
+                           ├─▶ internal/server
+                           └─▶ internal/update
 ```
 
 - `internal/download` 不知道 UI 的存在，进度通过 `notify` 回调和 `Event` 上报。
 - `internal/server` 只依赖 `download.Manager` 和令牌，不碰窗口状态。
+- `internal/update` 只查 GitHub Release 并比较版本，不下载、不安装更新；界面把安装包
+  交给浏览器，避免在 ad-hoc 签名的应用上擅自替换自身。
 - `internal/app` 单向依赖其它 `internal` 包；`view_*.go` 只读 `App` 状态并调用
   `actions.go`，不直接改引擎内部字段。
 - `format.go` 与 `theme.go` 无副作用，可以直接单测。
