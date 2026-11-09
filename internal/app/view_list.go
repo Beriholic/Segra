@@ -22,17 +22,17 @@ func (a *App) row(c *ui.Context, i int) {
 	}
 	ui.Box(c).Key(t.ID).Height(79).Padding(0, 0, 13, 0).Transition(tr).Children(func() {
 		card := ui.Box(c).Height(65).Radius(10).FillWidth().
-			Background(colCard).Border(1, colLine).
-			Shadow(0, 1, 2, 0, ui.RGBA(28, 28, 30, 0.04)).
+			Background(a.pal.card).Border(1, a.pal.line).
+			Shadow(0, 1, 2, 0, a.pal.shadowSoft).
 			FocusRing(false)
 		switch {
 		case card.Hovered():
-			card = card.Background(ui.RGB(0xFF, 0xFF, 0xFF)).Shadow(0, 2, 6, 0, ui.RGBA(28, 28, 30, 0.06))
+			card = card.Background(a.pal.cardHover).Shadow(0, 2, 6, 0, a.pal.shadowHover)
 		case selected:
-			card = card.Background(colCardSel)
+			card = card.Background(a.pal.cardSel)
 		}
 		if selected {
-			card = card.Shadow(0, 2, 8, 0, ui.RGBA(28, 28, 30, 0.08))
+			card = card.Shadow(0, 2, 8, 0, a.pal.shadowSel)
 		}
 		// The card's colours fade as the pointer comes and goes, and it
 		// lifts by a point: a pose, so the hover costs no rebuild.
@@ -56,18 +56,18 @@ func (a *App) row(c *ui.Context, i int) {
 				mark = 1
 			}
 			ui.Box(c).Absolute().Left(-1).Top(9).Bottom(9).Width(4).Radius(2).
-				Background(colGreen).
+				Background(a.pal.green).
 				AnimatePose(ui.Pose{Fade: 1 - mark}, fadeCurve)
 			ui.Row(c).FillHeight().Padding(9, 12, 9, 13).Gap(12).AlignItems(ui.Center).Children(func() {
 				a.fileTile(c, t.FileName, 34)
 				ui.Column(c).Gap(3).Grow(1).Children(func() {
-					ui.Text(c, t.FileName).FontSize(14).Bold().SingleLine().Ellipsis("…").TextColor(colText)
+					ui.Text(c, t.FileName).FontSize(14).Bold().SingleLine().Ellipsis("…").TextColor(a.pal.text)
 					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-						ui.Box(c).Size(5, 5).Radius(3).Background(statusColor(t)).
+						ui.Box(c).Size(5, 5).Radius(3).Background(statusColor(a.pal, t)).
 							Transition(ui.ElementTransition{Colors: true, Duration: motionBase})
-						ui.Text(c, statusLabel(t)).FontSize(11.5).TextColor(statusColor(t)).SingleLine().
+						ui.Text(c, statusLabel(t)).FontSize(11.5).TextColor(statusColor(a.pal, t)).SingleLine().
 							ContentTransition(ui.ContentTransition{})
-						ui.Text(c, rowMeta(t)).FontSize(11.5).TextColor(colMuted).SingleLine().Ellipsis("…").Grow(1)
+						ui.Text(c, rowMeta(t)).FontSize(11.5).TextColor(a.pal.muted).SingleLine().Ellipsis("…").Grow(1)
 					})
 				})
 				a.rowStat(c, t)
@@ -85,13 +85,13 @@ func (a *App) drawLanded(p *ui.Painter, r ui.Rect, id string) {
 	if f <= 0 {
 		return
 	}
-	p.Stroke(ui.Rect{X: r.X + 0.5, Y: r.Y + 0.5, W: r.W - 1, H: r.H - 1}, colGreen.Alpha(0.45*f), 10, 1.5)
+	p.Stroke(ui.Rect{X: r.X + 0.5, Y: r.Y + 0.5, W: r.W - 1, H: r.H - 1}, a.pal.green.Alpha(0.45*f), 10, 1.5)
 	p.AnimationFrame()
 }
 
 func (a *App) fileTile(c *ui.Context, name string, size float32) {
-	ui.Box(c).Size(size, size).Radius(9).Center().Background(ui.RGB(0xF1, 0xEF, 0xE9)).Border(1, colLine).Children(func() {
-		ui.Icon(c, iconForName(name)).FontSize(size * 0.48).TextColor(ui.RGB(0x55, 0x55, 0x5C))
+	ui.Box(c).Size(size, size).Radius(9).Center().Background(a.pal.iconTile).Border(1, a.pal.line).Children(func() {
+		ui.Icon(c, iconForName(name)).FontSize(size * 0.48).TextColor(a.pal.iconInk)
 	})
 }
 
@@ -101,22 +101,22 @@ func (a *App) rowStat(c *ui.Context, t download.Task) {
 		case download.StatusDownloading:
 			value, unit := splitSpeed(t.Speed)
 			ui.Row(c).Gap(3).AlignItems(ui.Baseline).Children(func() {
-				ui.Text(c, value).FontSize(14).Bold().FontFeatures("tnum").TextColor(colText)
-				ui.Text(c, unit).FontSize(9.5).TextColor(colMuted)
+				ui.Text(c, value).FontSize(14).Bold().FontFeatures("tnum").TextColor(a.pal.text)
+				ui.Text(c, unit).FontSize(9.5).TextColor(a.pal.muted)
 			})
-			ui.Text(c, etaLabel(t)).FontSize(10.5).TextColor(colMuted).SingleLine()
+			ui.Text(c, etaLabel(t)).FontSize(10.5).TextColor(a.pal.muted).SingleLine()
 		case download.StatusCompleted:
-			ui.Text(c, locales.CompletedStatus()).FontSize(12).Bold().TextColor(colGreen)
-			ui.Text(c, formatBytes(t.Size)).FontSize(11).TextColor(colMuted).SingleLine()
+			ui.Text(c, locales.CompletedStatus()).FontSize(12).Bold().TextColor(a.pal.green)
+			ui.Text(c, formatBytes(t.Size)).FontSize(11).TextColor(a.pal.muted).SingleLine()
 		case download.StatusPaused:
-			ui.Text(c, percentLabel(t)).FontSize(13).Bold().FontFeatures("tnum").TextColor(colWarn)
-			ui.Text(c, locales.Paused()).FontSize(10.5).TextColor(colMuted)
+			ui.Text(c, percentLabel(t)).FontSize(13).Bold().FontFeatures("tnum").TextColor(a.pal.warn)
+			ui.Text(c, locales.Paused()).FontSize(10.5).TextColor(a.pal.muted)
 		case download.StatusFailed:
-			ui.Text(c, "✕").FontSize(13).Bold().TextColor(colDanger)
-			ui.Text(c, locales.FailedStatus()).FontSize(10.5).TextColor(colMuted)
+			ui.Text(c, "✕").FontSize(13).Bold().TextColor(a.pal.danger)
+			ui.Text(c, locales.FailedStatus()).FontSize(10.5).TextColor(a.pal.muted)
 		default:
-			ui.Text(c, "—").FontSize(12).TextColor(colMuted)
-			ui.Text(c, locales.Queued()).FontSize(10.5).TextColor(colMuted)
+			ui.Text(c, "—").FontSize(12).TextColor(a.pal.muted)
+			ui.Text(c, locales.Queued()).FontSize(10.5).TextColor(a.pal.muted)
 		}
 	})
 }
@@ -135,12 +135,12 @@ func (a *App) rowAction(c *ui.Context, t download.Task) {
 	}
 	btn := ui.Box(c).Size(26, 26).Radius(8).AlignItems(ui.Center).Justify(ui.Center)
 	if btn.Hovered() {
-		btn = btn.Background(ui.RGBA(28, 28, 30, 0.06))
+		btn = btn.Background(a.pal.hover)
 	}
 	btn.Transition(hoverColors)
 	btn.AnimatePose(pressPose(btn), springSnap)
 	btn.Tooltip(tip).OnClick(fn).Children(func() {
-		ui.Icon(c, icon).FontSize(15).TextColor(colMuted)
+		ui.Icon(c, icon).FontSize(15).TextColor(a.pal.muted)
 	})
 }
 

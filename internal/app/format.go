@@ -27,29 +27,29 @@ func statusLabel(t download.Task) string {
 	}
 }
 
-func statusColor(t download.Task) ui.Color {
+func statusColor(p palette, t download.Task) ui.Color {
 	switch t.Status {
 	case download.StatusDownloading:
-		return colGreen
+		return p.green
 	case download.StatusCompleted:
-		return colGreen
+		return p.green
 	case download.StatusFailed:
-		return colDanger
+		return p.danger
 	case download.StatusPaused:
-		return colWarn
+		return p.warn
 	default:
-		return colMuted
+		return p.muted
 	}
 }
 
-func progressColor(t download.Task) ui.Color {
+func progressColor(p palette, t download.Task) ui.Color {
 	if t.Status == download.StatusPaused {
-		return colWarn
+		return p.warn
 	}
 	if t.Status == download.StatusFailed {
-		return colDanger
+		return p.danger
 	}
-	return colGreen
+	return p.green
 }
 
 func rowMeta(t download.Task) string {

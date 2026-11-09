@@ -66,3 +66,69 @@ func TestSettingsSayTheySaveByThemselves(t *testing.T) {
 		t.Fatalf("texts %q do not say the settings save by themselves", tt.Texts())
 	}
 }
+
+// The appearance is a setting like the others: it is written down as it is
+// picked, and the frame after it draws with it.
+func TestAppearanceSavesAsItIsPicked(t *testing.T) {
+	a := newTestApp(t)
+	a.view = "settings"
+	a.setTheme(store.ThemeDark)
+
+	saved, err := a.store.LoadSettings(store.DefaultSettings(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Theme != store.ThemeDark {
+		t.Fatalf("saved theme = %q, want %q", saved.Theme, store.ThemeDark)
+	}
+	tt := ui.NewTester(a.viewFn, 1180, 760)
+	tt.Frame()
+	if !a.pal.dark {
+		t.Fatal("the frame was built with the light palette")
+	}
+	if r, _, _, _ := tt.Image().At(600, 640).RGBA(); r > 0x8000 {
+		t.Fatalf("the page is not dark: red = %#04x", r>>8)
+	}
+}
+
+// Following the desktop is the default, and it is the desktop's appearance
+// that decides the palette, not a choice of the user's.
+func TestAppearanceFollowsTheDesktop(t *testing.T) {
+	a := newTestApp(t)
+	if a.settings.Theme != store.ThemeSystem {
+		t.Fatalf("a first run chose %q, want the system's", a.settings.Theme)
+	}
+	tt := ui.NewTester(a.viewFn, 1180, 760)
+	tt.Frame()
+	if a.pal.dark {
+		t.Fatal("the frame is dark while the desktop is light")
+	}
+
+	// The desktop turns dark under a window that follows it.
+	tt.SetDark(true)
+	tt.Frame()
+	if !a.pal.dark {
+		t.Fatal("the frame is light while the desktop is dark")
+	}
+	if r, _, _, _ := tt.Image().At(600, 640).RGBA(); r > 0x8000 {
+		t.Fatalf("the page is not dark: red = %#04x", r>>8)
+	}
+}
+
+// The settings offer the three appearances, and the picker chooses one.
+func TestSettingsChooseAnAppearance(t *testing.T) {
+	a := newTestApp(t)
+	a.view = "settings"
+	tt := ui.NewTester(a.viewFn, 1180, 1200)
+	for _, label := range []string{locales.ThemeSystem(), locales.ThemeLight(), locales.ThemeDark()} {
+		if !tt.HasText(label) {
+			t.Fatalf("texts %q do not offer %q", tt.Texts(), label)
+		}
+	}
+	if err := tt.Click(locales.ThemeDark()); err != nil {
+		t.Fatal(err)
+	}
+	if a.settings.Theme != store.ThemeDark {
+		t.Fatalf("theme = %q after choosing dark, want %q", a.settings.Theme, store.ThemeDark)
+	}
+}

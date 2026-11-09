@@ -14,6 +14,14 @@ import (
 
 const settingsVersion = 1
 
+// The appearances the settings offer: the desktop's, or one of the two the
+// app draws itself.
+const (
+	ThemeSystem = "" // follow the desktop
+	ThemeLight  = "light"
+	ThemeDark   = "dark"
+)
+
 // Settings are the user's preferences.
 type Settings struct {
 	Version       int    `json:"version"`
@@ -24,6 +32,7 @@ type Settings struct {
 	APIToken      string `json:"apiToken"`
 	EnableAPI     bool   `json:"enableAPI"`
 	Language      string `json:"language"` // "" follows the system
+	Theme         string `json:"theme"`    // "" follows the system
 	Notifications bool   `json:"notifications"`
 	AutoResume    bool   `json:"autoResume"`
 	ClipboardFill bool   `json:"clipboardFill"`
@@ -77,6 +86,13 @@ func (s *Settings) Normalize() {
 	}
 	if s.DownloadDir == "" {
 		s.DownloadDir = "."
+	}
+	switch s.Theme {
+	case ThemeLight, ThemeDark:
+	default:
+		// A value from a newer build, or a hand-edited file: the desktop's
+		// appearance is the one that cannot be wrong.
+		s.Theme = ThemeSystem
 	}
 }
 

@@ -158,6 +158,22 @@ func (a *App) setLanguage(tag string) {
 	a.buildMenu()
 }
 
+// setTheme switches the appearance and writes it down. The system's own
+// chrome — the title bar, the menus, the dialogs — follows through
+// mygo.Theme, so the window is not the only thing that turns dark.
+func (a *App) setTheme(tag string) {
+	a.settings.Theme = tag
+	a.themePick = themeIndex(tag)
+	if err := a.store.SaveSettings(a.settings); err != nil {
+		log.Printf("save settings: %v", err)
+	}
+	if mygo.App.IsReady() {
+		mygo.Theme.SetSource(mygo.ThemeSource(tag))
+	}
+	a.invalidate()
+	a.invalidatePanel()
+}
+
 // applySettings makes the app run on what the settings view holds, and
 // writes it down: there is no Save button, so every control calls this as
 // it changes. A folder that is only half typed is skipped by the view, and
@@ -245,4 +261,5 @@ func (a *App) syncFields() {
 	a.concurrentField = float64(a.settings.MaxConcurrent)
 	a.portField = float64(a.settings.APIPort)
 	a.langTag = a.settings.Language
+	a.themePick = themeIndex(a.settings.Theme)
 }

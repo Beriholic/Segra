@@ -67,3 +67,44 @@ func TestLoadSettingsKeepsCustomConnections(t *testing.T) {
 		t.Fatalf("connections = %d, want 4", got.Connections)
 	}
 }
+
+func TestSettingsKeepTheAppearance(t *testing.T) {
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := DefaultSettings("/tmp")
+	v.Theme = ThemeDark
+	if err := s.SaveSettings(v); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.LoadSettings(DefaultSettings("/tmp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Theme != ThemeDark {
+		t.Fatalf("theme = %q, want %q", got.Theme, ThemeDark)
+	}
+}
+
+// A theme a later build wrote, or a hand-edited file, is not an appearance
+// the app can draw: the desktop's is the one that cannot be wrong.
+func TestUnknownAppearanceFallsBackToTheSystem(t *testing.T) {
+	dir := t.TempDir()
+	old := `{"downloadDir":"/tmp","theme":"solarized"}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.LoadSettings(DefaultSettings("/tmp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Theme != ThemeSystem {
+		t.Fatalf("theme = %q, want the system's", got.Theme)
+	}
+}

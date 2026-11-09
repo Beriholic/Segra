@@ -157,12 +157,13 @@ func (a *App) closePanel() {
 // map of the bytes it has, and the buttons that act on them.
 func (a *App) panelView(c *ui.Context) {
 	a.refresh()
-	c.SetTheme(segraTheme())
+	a.usePalette(c)
+	c.SetTheme(segraTheme(a.pal))
 
 	// The flyout has no frame of its own: the panel draws all of it, its
 	// shape rounded as the system rounds a popover.
 	c.Root().Background(ui.Transparent)
-	box := ui.Column(c).Fill().Background(colCard)
+	box := ui.Column(c).Fill().Background(a.pal.card)
 	switch runtime.GOOS {
 	case "darwin":
 		// The system's shadow follows the shape and outlines it.
@@ -170,7 +171,7 @@ func (a *App) panelView(c *ui.Context) {
 	case "windows":
 		// Windows rounds and outlines the flyout as it rounds its menus.
 	default:
-		box = box.Radius(panelRadius).Border(1, colEdge)
+		box = box.Radius(panelRadius).Border(1, a.pal.edge)
 	}
 
 	tasks := panelTasks(a.tasks)
@@ -184,7 +185,7 @@ func (a *App) panelView(c *ui.Context) {
 
 	box.Padding(panelPad).Gap(panelGap).Children(func() {
 		if len(tasks) == 0 {
-			ui.Text(c, locales.PanelIdle()).FontSize(12).TextColor(colMuted).SingleLine().Ellipsis("…")
+			ui.Text(c, locales.PanelIdle()).FontSize(12).TextColor(a.pal.muted).SingleLine().Ellipsis("…")
 		} else {
 			a.panelHeader(c, tasks, panelTotal(a.tasks))
 			ui.Column(c).Gap(panelTaskGap).Children(func() {
@@ -194,7 +195,7 @@ func (a *App) panelView(c *ui.Context) {
 			})
 		}
 		ui.Spacer(c)
-		ui.Box(c).Height(1).Background(colLine)
+		ui.Box(c).Height(1).Background(a.pal.line)
 		a.panelActions(c, panelRunning(tasks))
 	})
 }
@@ -224,10 +225,10 @@ func (a *App) panelHeader(c *ui.Context, tasks []download.Task, total int) {
 		}
 	}
 	ui.Row(c).Height(16).AlignItems(ui.Center).Gap(8).Children(func() {
-		ui.Text(c, label).FontSize(11.5).FontWeight(600).TextColor(colLabel).Grow(1).SingleLine().Ellipsis("…")
+		ui.Text(c, label).FontSize(11.5).FontWeight(600).TextColor(a.pal.label).Grow(1).SingleLine().Ellipsis("…")
 		if speed > 0 {
 			value, unit := splitSpeed(speed)
-			ui.Text(c, value+" "+unit).FontSize(11.5).FontFeatures("tnum").TextColor(colGreen).SingleLine()
+			ui.Text(c, value+" "+unit).FontSize(11.5).FontFeatures("tnum").TextColor(a.pal.green).SingleLine()
 		}
 	})
 }
@@ -238,15 +239,15 @@ func (a *App) panelRow(c *ui.Context, t download.Task) {
 	paused := t.Status == download.StatusPaused
 	ui.Column(c).Gap(6).OnClick(func() { a.focusTask(t.ID) }).Children(func() {
 		ui.Row(c).Height(16).AlignItems(ui.Center).Gap(8).Children(func() {
-			ui.Text(c, t.FileName).FontSize(12.5).TextColor(colText).SingleLine().Ellipsis("…").Grow(1)
-			ui.Text(c, percentLabel(t)).FontSize(11.5).FontFeatures("tnum").TextColor(progressColor(t)).SingleLine()
+			ui.Text(c, t.FileName).FontSize(12.5).TextColor(a.pal.text).SingleLine().Ellipsis("…").Grow(1)
+			ui.Text(c, percentLabel(t)).FontSize(11.5).FontFeatures("tnum").TextColor(progressColor(a.pal, t)).SingleLine()
 		})
 		a.panelHeat(c, t, paused)
 		ui.Row(c).Height(14).AlignItems(ui.Center).Gap(8).Children(func() {
-			ui.Text(c, panelMeta(t)).FontSize(11).TextColor(colMuted).SingleLine().Ellipsis("…").Grow(1)
+			ui.Text(c, panelMeta(t)).FontSize(11).TextColor(a.pal.muted).SingleLine().Ellipsis("…").Grow(1)
 			if t.Speed > 0 {
 				value, unit := splitSpeed(t.Speed)
-				ui.Text(c, value+" "+unit).FontSize(11).FontFeatures("tnum").TextColor(colFaint).SingleLine()
+				ui.Text(c, value+" "+unit).FontSize(11).FontFeatures("tnum").TextColor(a.pal.faint).SingleLine()
 			}
 		})
 	})
@@ -266,7 +267,7 @@ func (a *App) panelHeat(c *ui.Context, t download.Task, paused bool) {
 	}
 	h := a.panelHeatFor(t.ID)
 	ui.Box(c).Height(panelHeatHeight).FillWidth().Draw(func(p *ui.Painter, r ui.Rect) {
-		drawHeat(p, r, h, t.ID, cells, paused, panelCellGap)
+		drawHeat(p, r, a.pal, h, t.ID, cells, paused, panelCellGap)
 	})
 }
 

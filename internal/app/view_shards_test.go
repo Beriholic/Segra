@@ -60,10 +60,10 @@ func TestChunkBlocksNothingKnown(t *testing.T) {
 }
 
 func TestChunkBlocksPausedFrontierCools(t *testing.T) {
-	if got := blockColor(blockActive, false); got != colBlockHot {
+	if got := lightPal.block(blockActive, false); got != lightPal.blockHot {
 		t.Fatalf("running frontier = %v, want the hot colour", got)
 	}
-	if got := blockColor(blockActive, true); got != colBlockCold {
+	if got := lightPal.block(blockActive, true); got != lightPal.blockCold {
 		t.Fatalf("paused frontier = %v, want the cold colour", got)
 	}
 }

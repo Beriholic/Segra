@@ -62,7 +62,7 @@ func sameBlocks(a, b []blockState) bool {
 // drawHeat paints the chunk map of one download in r: cells as large as the
 // room allows, each lit by how much of its bytes are on disk, moving from the
 // states the last frame showed to the ones the download has now.
-func drawHeat(p *ui.Painter, r ui.Rect, h *heatTween, id string, cells []blockState, paused bool, gap float32) {
+func drawHeat(p *ui.Painter, r ui.Rect, pal palette, h *heatTween, id string, cells []blockState, paused bool, gap float32) {
 	if len(cells) != chunkRows*chunkCols {
 		return
 	}
@@ -79,9 +79,9 @@ func drawHeat(p *ui.Painter, r ui.Rect, h *heatTween, id string, cells []blockSt
 	x0 := r.X + (r.W-w)/2
 	y0 := r.Y + (r.H-hh)/2
 	for i := range cells {
-		color := blockColor(cells[i], paused)
+		color := pal.block(cells[i], paused)
 		if k < 1 {
-			color = blockColor(h.from[i], paused).Mix(color, k)
+			color = pal.block(h.from[i], paused).Mix(color, k)
 		}
 		x := x0 + float32(i%chunkCols)*(size+gap)
 		y := y0 + float32(i/chunkCols)*(size+gap)

@@ -61,6 +61,10 @@ func Run(tray []byte) {
 	a.settings = settings
 	a.loginSaved = settings.OpenAtLogin
 	a.syncFields()
+	// The appearance takes hold before the window opens: mygo draws the
+	// title bar, the menus and the dialogs in it, and the first frame is
+	// built in it too.
+	mygo.Theme.SetSource(mygo.ThemeSource(settings.Theme))
 
 	mygo.App.OnSecondInstance(func(args []string, workingDir string) { a.showWindow() })
 	mygo.App.OnOpenURL(a.openDeepLink)

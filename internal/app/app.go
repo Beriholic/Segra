@@ -105,6 +105,11 @@ type App struct {
 	newConns float64
 	newErr   string
 
+	// pal is the palette the frame draws with, picked from the appearance as
+	// each view builds, and themePick the segment the picker shows.
+	pal       palette
+	themePick int
+
 	dirField        string
 	connsField      float64
 	concurrentField float64
@@ -558,6 +563,17 @@ func (a *App) invalidate() {
 	a.mu.Unlock()
 	if win != nil {
 		win.Invalidate()
+	}
+}
+
+// invalidatePanel repaints the menu bar panel, which shows the same
+// appearance as the window.
+func (a *App) invalidatePanel() {
+	a.mu.Lock()
+	panel := a.panel
+	a.mu.Unlock()
+	if panel != nil {
+		panel.Invalidate()
 	}
 }
 

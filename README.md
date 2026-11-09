@@ -22,8 +22,8 @@ video to the desktop app from the context menu.
   size, `ETag` and `Last-Modified` on the way back in. Pausing, quitting and restarting lose
   nothing.
 - **Queue and concurrency** — 1–8 downloads at a time, pause all / resume all, retry failures.
-- **Native UI** — drawn by mygo's `ui` package, light and dark following the system, in English
-  and Simplified Chinese, following the system or chosen by hand.
+- **Native UI** — drawn by mygo's `ui` package, light or dark, following the system or chosen
+  in the settings, in English and Simplified Chinese, following the system or chosen by hand.
 - **Browser extension** — takes over the browser's downloads: the browser's copy is cancelled and
   Segra fetches the file with the same cookies and referrer. A link, image, video or audio file
   can still be sent from the context menu, and the port and token are set in the toolbar popup.

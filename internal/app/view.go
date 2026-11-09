@@ -13,7 +13,8 @@ import (
 // viewFn draws the window. It runs every frame; all state lives on app.
 func (a *App) viewFn(c *ui.Context) {
 	a.refresh()
-	c.SetTheme(segraTheme())
+	a.usePalette(c)
+	c.SetTheme(segraTheme(a.pal))
 	// A folder typed into the settings is done with when its view is left,
 	// or the field would go away before anything saved it.
 	if a.view != "settings" {
@@ -34,7 +35,7 @@ func (a *App) viewFn(c *ui.Context) {
 		strip = 28
 	}
 
-	ui.Column(c).Fill().Background(colBG).Children(func() {
+	ui.Column(c).Fill().Background(a.pal.bg).Children(func() {
 		ui.Row(c).Grow(1).AlignItems(ui.Stretch).Children(func() {
 			a.sidebar(c, strip)
 			a.content(c, strip)
@@ -50,11 +51,11 @@ func (a *App) viewFn(c *ui.Context) {
 }
 
 func (a *App) sidebar(c *ui.Context, strip float32) {
-	ui.Column(c).Width(218).FillHeight().Background(colSide).Children(func() {
-		ui.Box(c).Absolute().Right(0).Top(0).Bottom(0).Width(1).Background(colEdge)
+	ui.Column(c).Width(218).FillHeight().Background(a.pal.side).Children(func() {
+		ui.Box(c).Absolute().Right(0).Top(0).Bottom(0).Width(1).Background(a.pal.edge)
 		ui.Column(c).Grow(1).Padding(strip+12, 12, 4, 12).Children(func() {
 			ui.SearchField(c, &a.search).Placeholder(locales.Search()).Height(32).
-				Background(ui.RGB(0xFF, 0xFF, 0xFF)).Border(1, colEdge).Radius(10)
+				Background(a.pal.input).Border(1, a.pal.edge).Radius(10)
 			ui.Box(c).Height(18)
 
 			a.sectionLabel(c, locales.Downloads())
@@ -113,7 +114,7 @@ func (a *App) navGroup(c *ui.Context, items []navEntry) {
 		if op <= 0.01 {
 			return
 		}
-		p.Fill(ui.Rect{X: r.X, Y: r.Y + y, W: r.W, H: 32}, colSel.Alpha(op), 10)
+		p.Fill(ui.Rect{X: r.X, Y: r.Y + y, W: r.W, H: 32}, a.pal.sel.Alpha(op), 10)
 	})
 	group.Children(func() {
 		for _, it := range items {
@@ -126,7 +127,7 @@ func (a *App) navItem(c *ui.Context, it navEntry) {
 	selected := a.view == it.id
 	item := ui.Row(c).Height(32).Margin(0, 0, 3, 0).Padding(0, 10).Gap(9).AlignItems(ui.Center).Radius(10)
 	if item.Hovered() && !selected {
-		item = item.Background(ui.RGBA(255, 255, 255, 0.55))
+		item = item.Background(a.pal.navHover)
 	}
 	item.Transition(hoverColors)
 	item.OnClick(func() {
@@ -137,9 +138,9 @@ func (a *App) navItem(c *ui.Context, it navEntry) {
 		a.selected = -1
 		a.refresh()
 	})
-	iconColor, textColor := colMuted, colSub
+	iconColor, textColor := a.pal.muted, a.pal.sub
 	if selected {
-		iconColor, textColor = colGreen, colGreen
+		iconColor, textColor = a.pal.green, a.pal.green
 	}
 	iconColor = item.AnimateColor("icon", iconColor, fadeCurve)
 	textColor = item.AnimateColor("text", textColor, fadeCurve)
@@ -150,13 +151,13 @@ func (a *App) navItem(c *ui.Context, it navEntry) {
 			text.Bold()
 		}
 		if it.dot {
-			ui.Box(c).Size(6, 6).Radius(3).Background(colGreen)
+			ui.Box(c).Size(6, 6).Radius(3).Background(a.pal.green)
 		}
 		if it.count > 0 {
-			ui.Box(c).Padding(1, 6).Radius(6).Background(colPill).Children(func() {
-				countColor := colMuted
+			ui.Box(c).Padding(1, 6).Radius(6).Background(a.pal.pill).Children(func() {
+				countColor := a.pal.muted
 				if selected {
-					countColor = colGreen
+					countColor = a.pal.green
 				}
 				ui.Text(c, fmt.Sprint(it.count)).FontSize(10.5).FontFeatures("tnum").TextColor(countColor)
 			})
@@ -205,7 +206,7 @@ func (a *App) content(c *ui.Context, strip float32) {
 func (a *App) mainHeader(c *ui.Context) {
 	active := a.mgr.ActiveCount()
 	ui.Row(c).AlignItems(ui.Center).Gap(10).Padding(0, 0, 16, 0).Children(func() {
-		ui.Text(c, locales.Downloads()).FontSize(26).Bold().TextColor(colText).Grow(1)
+		ui.Text(c, locales.Downloads()).FontSize(26).Bold().TextColor(a.pal.text).Grow(1)
 		pause := a.secondaryButton(c, locales.PauseAll(), func() { a.mgr.PauseAll() }).Height(34).Radius(17).Disabled(active == 0)
 		if active == 0 {
 			pause.Opacity(0.5)
@@ -218,24 +219,24 @@ func (a *App) emptyState(c *ui.Context) {
 	ui.Column(c).Key("empty").Grow(1).Center().Gap(9).
 		Transition(ui.ElementTransition{Animation: &springSoft, Enter: fadeIn(10)}).
 		Children(func() {
-			ui.Box(c).Size(56, 56).Radius(18).Center().Background(colSide).Children(func() {
-				ui.Icon(c, icDownload).FontSize(24).TextColor(colGreen)
+			ui.Box(c).Size(56, 56).Radius(18).Center().Background(a.pal.side).Children(func() {
+				ui.Icon(c, icDownload).FontSize(24).TextColor(a.pal.green)
 			})
 			ui.Box(c).Height(4)
-			ui.Text(c, locales.NoTasks()).FontSize(16).Bold().TextColor(colText)
-			ui.Text(c, locales.NoTasksHint()).FontSize(12.5).TextColor(colMuted).TextAlign(ui.Center).MaxWidth(340)
+			ui.Text(c, locales.NoTasks()).FontSize(16).Bold().TextColor(a.pal.text)
+			ui.Text(c, locales.NoTasksHint()).FontSize(12.5).TextColor(a.pal.muted).TextAlign(ui.Center).MaxWidth(340)
 			ui.Box(c).Height(4)
 			a.primaryButton(c, locales.NewDownload(), a.openNew)
 		})
 }
 
 func (a *App) statusBar(c *ui.Context) {
-	ui.Row(c).Height(30).Padding(0, 16).Gap(12).AlignItems(ui.Center).Background(colBar).Children(func() {
-		ui.Box(c).Absolute().Left(0).Right(0).Top(0).Height(1).Background(colEdge)
-		ui.Text(c, fmt.Sprintf("%d %s", len(a.tasks), locales.Files())).FontSize(11).TextColor(colSub).SingleLine().Grow(1)
+	ui.Row(c).Height(30).Padding(0, 16).Gap(12).AlignItems(ui.Center).Background(a.pal.bar).Children(func() {
+		ui.Box(c).Absolute().Left(0).Right(0).Top(0).Height(1).Background(a.pal.edge)
+		ui.Text(c, fmt.Sprintf("%d %s", len(a.tasks), locales.Files())).FontSize(11).TextColor(a.pal.sub).SingleLine().Grow(1)
 		if a.apiErr != "" {
-			ui.Text(c, locales.ApiRunning()+": "+a.apiErr).FontSize(11).TextColor(colDanger).SingleLine()
+			ui.Text(c, locales.ApiRunning()+": "+a.apiErr).FontSize(11).TextColor(a.pal.danger).SingleLine()
 		}
-		ui.Text(c, fmt.Sprintf("%d %s", a.mgr.ActiveCount(), locales.Active())).FontSize(11).TextColor(colSub)
+		ui.Text(c, fmt.Sprintf("%d %s", a.mgr.ActiveCount(), locales.Active())).FontSize(11).TextColor(a.pal.sub)
 	})
 }

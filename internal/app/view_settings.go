@@ -8,6 +8,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"github.com/beriholic/segra/extension"
+	"github.com/beriholic/segra/internal/store"
 	"github.com/beriholic/segra/locales"
 )
 
@@ -17,18 +18,18 @@ func (a *App) settingsView(c *ui.Context) {
 		// The right padding keeps the cards and the version line clear of the
 		// overlay scroll bar.
 		ui.Column(c).FillWidth().Gap(12).Padding(0, 16, 18, 0).Children(func() {
-			ui.Text(c, locales.SettingsTitle()).FontSize(26).Bold().TextColor(colText)
+			ui.Text(c, locales.SettingsTitle()).FontSize(26).Bold().TextColor(a.pal.text)
 
 			card := func(title string, fn func()) {
-				ui.Column(c).FillWidth().Padding(16, 18).Gap(12).Radius(12).Background(colCard).Border(1, colLine).Children(func() {
-					ui.Text(c, title).FontSize(12).FontWeight(600).TextColor(colLabel).SingleLine()
+				ui.Column(c).FillWidth().Padding(16, 18).Gap(12).Radius(12).Background(a.pal.card).Border(1, a.pal.line).Children(func() {
+					ui.Text(c, title).FontSize(12).FontWeight(600).TextColor(a.pal.label).SingleLine()
 					fn()
 				})
 			}
 
 			card(locales.DownloadFolder(), func() {
 				ui.Row(c).FillWidth().Gap(8).Children(func() {
-					in := ui.TextInput(c, &a.dirField).Grow(1).Height(32).Background(ui.RGB(0xFF, 0xFF, 0xFF)).Border(1, colLine).Radius(8)
+					in := ui.TextInput(c, &a.dirField).Grow(1).Height(32).Background(a.pal.input).Border(1, a.pal.line).Radius(8)
 					a.secondaryButton(c, locales.Browse(), func() { go a.browseSettingsDir() })
 					// A folder saves once it is the one the user means: a
 					// path half typed is not a setting, and no download
@@ -45,18 +46,18 @@ func (a *App) settingsView(c *ui.Context) {
 			card(locales.Downloads(), func() {
 				ui.Row(c).Gap(32).Children(func() {
 					ui.Column(c).Gap(6).Children(func() {
-						ui.Text(c, locales.Connections()).FontSize(12).TextColor(colMuted)
+						ui.Text(c, locales.Connections()).FontSize(12).TextColor(a.pal.muted)
 						if ui.NumberInput(c, &a.connsField, 1, 64, 1).Changed() {
 							a.applySettings()
 						}
-						ui.Text(c, locales.ConnectionsHint()).FontSize(11).TextColor(colFaint).MaxWidth(230)
+						ui.Text(c, locales.ConnectionsHint()).FontSize(11).TextColor(a.pal.faint).MaxWidth(230)
 					})
 					ui.Column(c).Gap(6).Children(func() {
-						ui.Text(c, locales.MaxConcurrent()).FontSize(12).TextColor(colMuted)
+						ui.Text(c, locales.MaxConcurrent()).FontSize(12).TextColor(a.pal.muted)
 						if ui.NumberInput(c, &a.concurrentField, 1, 8, 1).Changed() {
 							a.applySettings()
 						}
-						ui.Text(c, locales.MaxConcurrentHint()).FontSize(11).TextColor(colFaint).MaxWidth(210)
+						ui.Text(c, locales.MaxConcurrentHint()).FontSize(11).TextColor(a.pal.faint).MaxWidth(210)
 					})
 				})
 			})
@@ -69,25 +70,25 @@ func (a *App) settingsView(c *ui.Context) {
 						if ui.NumberInput(c, &a.portField, 1024, 65535, 1).Changed() {
 							a.applySettings()
 						}
-						label, color := locales.ApiOff(), colMuted
+						label, color := locales.ApiOff(), a.pal.muted
 						switch {
 						case on && a.apiErr != "":
-							label, color = a.apiErr, colDanger
+							label, color = a.apiErr, a.pal.danger
 						case on:
-							label, color = fmt.Sprintf("%s 127.0.0.1:%d", locales.ApiRunning(), a.apiPort), colGreen
+							label, color = fmt.Sprintf("%s 127.0.0.1:%d", locales.ApiRunning(), a.apiPort), a.pal.green
 						}
 						ui.Text(c, label).FontSize(11.5).TextColor(color).SingleLine().Ellipsis("…").Grow(1)
 					})
-					ui.Text(c, locales.Token()).FontSize(11).TextColor(colFaint)
+					ui.Text(c, locales.Token()).FontSize(11).TextColor(a.pal.faint)
 					ui.Row(c).FillWidth().Gap(8).Children(func() {
 						ui.TextInput(c, &a.settings.APIToken).ReadOnly(true).Font("monospace").FontSize(11).
-							Grow(1).Height(30).Background(ui.RGB(0xFF, 0xFF, 0xFF)).Border(1, colLine).Radius(8)
+							Grow(1).Height(30).Background(a.pal.input).Border(1, a.pal.line).Radius(8)
 						a.secondaryButton(c, locales.CopyToken(), func() {
 							mygo.Clipboard.WriteText(a.settings.APIToken)
 							c.Toast(locales.Copied())
 						})
 					})
-					ui.Text(c, locales.TokenHint()).FontSize(11).TextColor(colFaint)
+					ui.Text(c, locales.TokenHint()).FontSize(11).TextColor(a.pal.faint)
 				})
 				if !on {
 					body.Opacity(0.45)
@@ -95,16 +96,28 @@ func (a *App) settingsView(c *ui.Context) {
 			})
 
 			card(locales.BrowserExtension(), func() {
-				ui.Text(c, locales.BrowserExtensionHint()).FontSize(11.5).TextColor(colFaint)
+				ui.Text(c, locales.BrowserExtensionHint()).FontSize(11.5).TextColor(a.pal.faint)
 				ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
 					a.secondaryButton(c, locales.ExportExtension(), func() {
 						go a.exportExtension(a.settings.APIPort, a.settings.APIToken)
 					})
 					if v := extension.Version; v != "" {
-						ui.Text(c, "v"+v).FontSize(11).TextColor(colFaint)
+						ui.Text(c, "v"+v).FontSize(11).TextColor(a.pal.faint)
 					}
 				})
-				ui.Text(c, locales.ExtensionInstallHint()).FontSize(11).TextColor(colFaint)
+				ui.Text(c, locales.ExtensionInstallHint()).FontSize(11).TextColor(a.pal.faint)
+			})
+
+			card(locales.Appearance(), func() {
+				labels, tags := themeChoices()
+				// The control takes the width of its labels: a track
+				// stretched across the card leaves the segments bunched at
+				// its start.
+				sel := ui.Segmented(c, &a.themePick, labels...).AlignSelf(ui.Start).Label(locales.Appearance())
+				if sel.Changed() && a.themePick >= 0 && a.themePick < len(tags) {
+					a.setTheme(tags[a.themePick])
+				}
+				ui.Text(c, locales.AppearanceHint()).FontSize(11).TextColor(a.pal.faint).MaxWidth(360)
 			})
 
 			card(locales.Language(), func() {
@@ -145,7 +158,7 @@ func (a *App) settingsView(c *ui.Context) {
 			card(locales.Updates(), func() {
 				a.switchRow(c, locales.CheckUpdates(), locales.CheckUpdatesHint(), &a.settings.CheckUpdates)
 				snapshot := a.snapshotUpdate()
-				label, color := updateStatus(snapshot)
+				label, color := updateStatus(a.pal, snapshot)
 				ui.Row(c).FillWidth().Gap(10).AlignItems(ui.Center).Children(func() {
 					status := ui.Text(c, label).FontSize(11.5).TextColor(color).Grow(1).SingleLine().Ellipsis("…")
 					if snapshot.Err != "" {
@@ -169,12 +182,30 @@ func (a *App) settingsView(c *ui.Context) {
 				// There is no Save button: every control writes its setting
 				// down as it changes, and the line says so where the button
 				// used to be.
-				ui.Text(c, locales.AutoSave()).FontSize(11.5).TextColor(colFaint).SingleLine()
+				ui.Text(c, locales.AutoSave()).FontSize(11.5).TextColor(a.pal.faint).SingleLine()
 				ui.Spacer(c)
-				ui.Text(c, fmt.Sprintf("%s %s", locales.Version(), mygo.App.Version())).FontSize(11).TextColor(colFaint)
+				ui.Text(c, fmt.Sprintf("%s %s", locales.Version(), mygo.App.Version())).FontSize(11).TextColor(a.pal.faint)
 			})
 		})
 	})
+}
+
+// themeChoices are the appearances the settings offer: their labels in the
+// language the app shows, and the tags the app stores.
+func themeChoices() (labels, tags []string) {
+	return []string{locales.ThemeSystem(), locales.ThemeLight(), locales.ThemeDark()},
+		[]string{store.ThemeSystem, store.ThemeLight, store.ThemeDark}
+}
+
+// themeIndex is the segment the appearance picker shows for a tag.
+func themeIndex(tag string) int {
+	_, tags := themeChoices()
+	for i, t := range tags {
+		if t == tag {
+			return i
+		}
+	}
+	return 0
 }
 
 // languageChoices are the languages the settings offer: their labels in the

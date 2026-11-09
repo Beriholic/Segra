@@ -9,14 +9,14 @@ func (a *App) pillButton(c *ui.Context, label string, icon *ui.SVG, primary bool
 	b := ui.ButtonBase(c).Height(32).Radius(16).Padding(0, 16).Gap(7).
 		AlignItems(ui.Center).Justify(ui.Center).FocusRing(false).Label(label)
 	if primary {
-		b = b.Background(colGreen)
+		b = b.Background(a.pal.green)
 		if b.Hovered() {
-			b = b.Background(colGreenDeep)
+			b = b.Background(a.pal.greenDeep)
 		}
 	} else {
-		b = b.Background(colCard).Border(1, colLine)
+		b = b.Background(a.pal.card).Border(1, a.pal.line)
 		if b.Hovered() {
-			b = b.Background(ui.RGB(0xFF, 0xFF, 0xFF)).Border(1, colEdge)
+			b = b.Background(a.pal.cardHover).Border(1, a.pal.edge)
 		}
 	}
 	// The colour fades in and out of the frame that follows the pointer,
@@ -26,9 +26,9 @@ func (a *App) pillButton(c *ui.Context, label string, icon *ui.SVG, primary bool
 	b.OnClick(fn)
 	b.Children(func() {
 		if icon != nil {
-			iconColor := colMuted
+			iconColor := a.pal.muted
 			if primary {
-				iconColor = ui.RGB(0xFF, 0xFF, 0xFF)
+				iconColor = a.pal.onGreen
 			}
 			ui.Icon(c, icon).FontSize(13).TextColor(iconColor)
 		}
@@ -36,9 +36,9 @@ func (a *App) pillButton(c *ui.Context, label string, icon *ui.SVG, primary bool
 		// footer is: the label gives way rather than growing the pill.
 		text := ui.Text(c, label).FontSize(12.5).SingleLine().Ellipsis("…")
 		if primary {
-			text = text.Bold().TextColor(ui.RGB(0xFF, 0xFF, 0xFF))
+			text = text.Bold().TextColor(a.pal.onGreen)
 		} else {
-			text = text.TextColor(colText)
+			text = text.TextColor(a.pal.text)
 		}
 	})
 	return b
@@ -68,27 +68,27 @@ func (a *App) primaryButton(c *ui.Context, label string, fn func()) ui.Element {
 func (a *App) iconButton(c *ui.Context, icon *ui.SVG, tip string, fn func()) ui.Element {
 	btn := ui.Box(c).Size(26, 26).Radius(7).AlignItems(ui.Center).Justify(ui.Center)
 	if btn.Hovered() {
-		btn = btn.Background(ui.RGBA(28, 28, 30, 0.06))
+		btn = btn.Background(a.pal.hover)
 	}
 	btn.Transition(hoverColors)
 	btn.AnimatePose(pressPose(btn), springSnap)
 	return btn.Tooltip(tip).OnClick(fn).Children(func() {
-		ui.Icon(c, icon).FontSize(15).TextColor(colMuted)
+		ui.Icon(c, icon).FontSize(15).TextColor(a.pal.muted)
 	})
 }
 
 func (a *App) chip(c *ui.Context, label string) {
-	ui.Box(c).Padding(2, 7).Radius(6).Background(colChip).Children(func() {
-		ui.Text(c, label).FontSize(11).TextColor(colMuted).SingleLine()
+	ui.Box(c).Padding(2, 7).Radius(6).Background(a.pal.chip).Children(func() {
+		ui.Text(c, label).FontSize(11).TextColor(a.pal.muted).SingleLine()
 	})
 }
 
 func (a *App) switchRow(c *ui.Context, label, hint string, value *bool) {
 	ui.Row(c).AlignItems(ui.Center).Gap(12).Children(func() {
 		ui.Column(c).Gap(2).Grow(1).Children(func() {
-			ui.Text(c, label).FontSize(12.5).TextColor(colText)
+			ui.Text(c, label).FontSize(12.5).TextColor(a.pal.text)
 			if hint != "" {
-				ui.Text(c, hint).FontSize(11).TextColor(colFaint)
+				ui.Text(c, hint).FontSize(11).TextColor(a.pal.faint)
 			}
 		})
 		// A switch is the whole setting, so it saves as it flips.
@@ -99,5 +99,5 @@ func (a *App) switchRow(c *ui.Context, label, hint string, value *bool) {
 }
 
 func (a *App) sectionLabel(c *ui.Context, label string) {
-	ui.Text(c, label).FontSize(12).FontWeight(600).TextColor(colLabel).Padding(8, 8, 4, 8).SingleLine()
+	ui.Text(c, label).FontSize(12).FontWeight(600).TextColor(a.pal.label).Padding(8, 8, 4, 8).SingleLine()
 }

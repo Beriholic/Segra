@@ -16,24 +16,24 @@ const updateNotesRoom = 168
 
 // updateStatus is the line under the update switch: what the last check
 // found, in the colour that says whether it needs anything.
-func updateStatus(snapshot updateSnapshot) (string, ui.Color) {
+func updateStatus(p palette, snapshot updateSnapshot) (string, ui.Color) {
 	switch {
 	case snapshot.Checking:
-		return locales.CheckingUpdates(), colMuted
+		return locales.CheckingUpdates(), p.muted
 	case snapshot.Err != "":
-		return locales.UpdateCheckFailed(), colDanger
+		return locales.UpdateCheckFailed(), p.danger
 	case snapshot.Result == nil:
-		return locales.UpdateNotChecked(), colFaint
+		return locales.UpdateNotChecked(), p.faint
 	case !snapshot.Result.Comparable:
-		return locales.DevBuild(), colFaint
+		return locales.DevBuild(), p.faint
 	case snapshot.Result.Newer:
 		return fmt.Sprintf(
 			locales.UpdateAvailableMsg(),
 			versionLabel(snapshot.Result.Release.Tag),
 			versionLabel(snapshot.Result.Current),
-		), colGreen
+		), p.green
 	default:
-		return locales.UpToDate(), colMuted
+		return locales.UpToDate(), p.muted
 	}
 }
 
@@ -51,27 +51,27 @@ func (a *App) updateDialog(c *ui.Context) {
 	dlg := ui.Modal(c, &a.updateOpen, func() {
 		ui.Column(c).FillWidth().Gap(12).Children(func() {
 			ui.Row(c).Gap(11).AlignItems(ui.Center).Children(func() {
-				ui.Box(c).Size(34, 34).Radius(10).Center().Background(colSel).Children(func() {
-					ui.Icon(c, icDownload).FontSize(17).TextColor(colGreen)
+				ui.Box(c).Size(34, 34).Radius(10).Center().Background(a.pal.sel).Children(func() {
+					ui.Icon(c, icDownload).FontSize(17).TextColor(a.pal.green)
 				})
 				ui.Column(c).Gap(2).Grow(1).Children(func() {
-					ui.Text(c, locales.UpdateAvailableTitle()).FontSize(16).Bold().TextColor(colText)
+					ui.Text(c, locales.UpdateAvailableTitle()).FontSize(16).Bold().TextColor(a.pal.text)
 					ui.Text(c, fmt.Sprintf(
 						locales.UpdateReadyMsg(),
 						versionLabel(release.Tag),
 						versionLabel(snapshot.Result.Current),
-					)).FontSize(11.5).TextColor(colMuted)
+					)).FontSize(11.5).TextColor(a.pal.muted)
 				})
 			})
 
-			ui.Box(c).Height(1).FillWidth().Background(colLine)
+			ui.Box(c).Height(1).FillWidth().Background(a.pal.line)
 
 			if notes != "" {
 				ui.Scroll(c).MaxHeight(updateNotesRoom).FillWidth().Children(func() {
-					ui.Text(c, notes).FontSize(11.5).TextColor(colSub)
+					ui.Text(c, notes).FontSize(11.5).TextColor(a.pal.sub)
 				})
 			} else {
-				ui.Text(c, locales.UpdateNotesHint()).FontSize(11.5).TextColor(colMuted)
+				ui.Text(c, locales.UpdateNotesHint()).FontSize(11.5).TextColor(a.pal.muted)
 			}
 
 			ui.Row(c).Gap(8).Justify(ui.End).AlignItems(ui.Center).Children(func() {
@@ -80,8 +80,8 @@ func (a *App) updateDialog(c *ui.Context) {
 				a.primaryButton(c, locales.DownloadUpdate(), a.downloadUpdate)
 			})
 		})
-	}).Width(468).Padding(20).Radius(14).Background(colCard).Border(1, colLine).
-		Shadow(0, 18, 50, 0, ui.RGBA(20, 20, 30, 0.18))
+	}).Width(468).Padding(20).Radius(14).Background(a.pal.card).Border(1, a.pal.line).
+		Shadow(0, 18, 50, 0, a.pal.shadowModal)
 
 	// The sheet steps up and grows into place from a timeline, as the New
 	// Download sheet does: the modal's panel is new in the frame it shows.

@@ -29,10 +29,10 @@ func (a *App) inspector(c *ui.Context, strip float32) {
 	if a.detailsCollapsed {
 		target = 66
 	}
-	panel := ui.Column(c).FillHeight().Background(colSurface).Clip()
+	panel := ui.Column(c).FillHeight().Background(a.pal.surface).Clip()
 	width := panel.AnimateTo("details-width", target, springSoft)
 	panel.Width(width).Children(func() {
-		ui.Box(c).Absolute().Left(0).Top(0).Bottom(0).Width(1).Background(colLineSoft)
+		ui.Box(c).Absolute().Left(0).Top(0).Bottom(0).Width(1).Background(a.pal.lineSoft)
 
 		// The body keeps its width while the panel folds, so it slides out of
 		// view instead of reflowing, and is drawn only while there is room.
@@ -45,7 +45,7 @@ func (a *App) inspector(c *ui.Context, strip float32) {
 				})
 			body.Children(func() {
 				ui.Row(c).Padding(0, 60, 0, 20).Height(strip + 30).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, locales.TaskDetails()).FontSize(14).Bold().SingleLine().TextColor(colText)
+					ui.Text(c, locales.TaskDetails()).FontSize(14).Bold().SingleLine().TextColor(a.pal.text)
 				})
 				if t == nil {
 					ui.Spacer(c)
@@ -95,7 +95,7 @@ func (a *App) inspectorFile(c *ui.Context, t download.Task) {
 	ui.Row(c).Gap(14).AlignItems(ui.Start).Children(func() {
 		a.fileTile(c, t.FileName, 52)
 		ui.Column(c).Gap(6).Grow(1).Children(func() {
-			ui.Text(c, t.FileName).FontSize(15).Bold().MaxLines(2).TextColor(colText)
+			ui.Text(c, t.FileName).FontSize(15).Bold().MaxLines(2).TextColor(a.pal.text)
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 				a.chip(c, typeLabel(t.FileName))
 				if t.Connections > 0 {
@@ -113,16 +113,16 @@ func (a *App) inspectorProgress(c *ui.Context, t download.Task) {
 	}
 	ui.Column(c).Gap(10).Children(func() {
 		ui.Row(c).AlignItems(ui.Baseline).Gap(8).Children(func() {
-			ui.Text(c, fmt.Sprintf("%.0f%%", pct*100)).FontSize(36).Bold().FontFeatures("tnum").TextColor(colText)
+			ui.Text(c, fmt.Sprintf("%.0f%%", pct*100)).FontSize(36).Bold().FontFeatures("tnum").TextColor(a.pal.text)
 			ui.Spacer(c)
-			ui.Text(c, fmt.Sprintf("%s / %s", formatBytes(t.Downloaded), sizeLabel(t.Size))).FontSize(12).TextColor(colMuted)
+			ui.Text(c, fmt.Sprintf("%s / %s", formatBytes(t.Downloaded), sizeLabel(t.Size))).FontSize(12).TextColor(a.pal.muted)
 		})
 		// The bar glides to the share it has, rather than jumping every time
 		// the manager reports progress.
-		ui.Box(c).Height(6).Radius(3).Background(colLineSoft).Children(func() {
+		ui.Box(c).Height(6).Radius(3).Background(a.pal.lineSoft).Children(func() {
 			bar := ui.Box(c).Height(6).Radius(3)
 			bar.WidthPercent(bar.AnimateTo("pct", float32(pct*100), fadeCurve)).
-				Background(progressColor(t))
+				Background(progressColor(a.pal, t))
 		})
 	})
 }
@@ -131,11 +131,11 @@ func (a *App) inspectorStats(c *ui.Context, t download.Task) {
 	value, unit := splitSpeed(t.Speed)
 	cell := func(label, value, unit string) {
 		ui.Column(c).Gap(4).Children(func() {
-			ui.Text(c, label).FontSize(11.5).TextColor(colLabel).SingleLine()
+			ui.Text(c, label).FontSize(11.5).TextColor(a.pal.label).SingleLine()
 			ui.Row(c).Gap(3).AlignItems(ui.Baseline).Children(func() {
-				ui.Text(c, value).FontSize(16).Bold().FontFeatures("tnum").TextColor(colText)
+				ui.Text(c, value).FontSize(16).Bold().FontFeatures("tnum").TextColor(a.pal.text)
 				if unit != "" {
-					ui.Text(c, unit).FontSize(11).TextColor(colMuted)
+					ui.Text(c, unit).FontSize(11).TextColor(a.pal.muted)
 				}
 			})
 		})
@@ -146,7 +146,7 @@ func (a *App) inspectorStats(c *ui.Context, t download.Task) {
 				cell(locales.Connections(), fmt.Sprint(t.Connections), "")
 				cell(locales.Remaining(), etaValue(t), "")
 			})
-			ui.Box(c).Width(1).Background(colLineSoft)
+			ui.Box(c).Width(1).Background(a.pal.lineSoft)
 			ui.Box(c).Width(16)
 			ui.Column(c).Grow(1).Gap(16).Children(func() {
 				if t.Status == download.StatusDownloading {
@@ -157,7 +157,7 @@ func (a *App) inspectorStats(c *ui.Context, t download.Task) {
 				cell(locales.Type(), typeLabel(t.FileName), "")
 			})
 		})
-		ui.Box(c).Height(1).FillWidth().Background(colLineSoft)
+		ui.Box(c).Height(1).FillWidth().Background(a.pal.lineSoft)
 	})
 }
 
@@ -170,8 +170,8 @@ func (a *App) inspectorSpark(c *ui.Context) {
 	}
 	ui.Column(c).Gap(8).Children(func() {
 		ui.Row(c).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, locales.SpeedLastMinute()).FontSize(11.5).TextColor(colLabel).Grow(1)
-			ui.Text(c, peak).FontSize(11).TextColor(colMuted)
+			ui.Text(c, locales.SpeedLastMinute()).FontSize(11.5).TextColor(a.pal.label).Grow(1)
+			ui.Text(c, peak).FontSize(11).TextColor(a.pal.muted)
 		})
 		ui.Box(c).Height(46).FillWidth().Draw(func(p *ui.Painter, r ui.Rect) {
 			a.drawSpark(p, r)
@@ -272,15 +272,15 @@ func (a *App) drawSpark(p *ui.Painter, r ui.Rect) {
 	area.LineTo(pts[len(pts)-1][0], floor)
 	area.Close()
 	p.FillPathGradient(area, ui.LinearGradient{
-		From:  ui.RGBA(0x2F, 0x7D, 0x57, 0.20),
-		To:    ui.RGBA(0x2F, 0x7D, 0x57, 0.00),
+		From:  a.pal.green.Alpha(0.20),
+		To:    a.pal.green.Alpha(0),
 		Angle: 180,
 	})
 
 	// The floor the curve stands on, and the curve itself over the stretches
 	// that carried bytes: a pause or a stall leaves the floor alone instead
 	// of dragging the green line along it.
-	p.Fill(ui.Rect{X: plot.X, Y: floor, W: plot.W, H: 1}, colLine, 0)
+	p.Fill(ui.Rect{X: plot.X, Y: floor, W: plot.W, H: 1}, a.pal.line, 0)
 	active := func(i int) bool { return pts[i][1] < floor-0.5 }
 	for i := 0; i < len(pts); {
 		if !active(i) {
@@ -297,7 +297,7 @@ func (a *App) drawSpark(p *ui.Painter, r ui.Rect) {
 		curve := &ui.Path{}
 		curve.MoveTo(pts[start][0], pts[start][1])
 		sparkCurve(curve, pts, start, end, plot.Y, floor)
-		p.StrokePath(curve, 1.6, colGreen)
+		p.StrokePath(curve, 1.6, a.pal.green)
 	}
 	if moving {
 		// The curve is still flowing to the samples it has: draw frames that
@@ -474,20 +474,6 @@ func fillBlocks(cells []blockState, p float64) []blockState {
 	return cells
 }
 
-func blockColor(state blockState, paused bool) ui.Color {
-	switch state {
-	case blockDone:
-		return colGreen
-	case blockActive:
-		if paused {
-			// A paused download writes nothing: the frontier cools off.
-			return colBlockCold
-		}
-		return colBlockHot
-	}
-	return colBlockTrack
-}
-
 // inspectorHeatHeight is the room the chunk map takes in the panel: the
 // cells of a row and the gaps between, plus the slack a drawn grid uses to
 // centre itself.
@@ -500,11 +486,11 @@ func (a *App) inspectorShards(c *ui.Context, t download.Task) {
 	}
 	paused := t.Status == download.StatusPaused
 	ui.Column(c).Gap(8).Children(func() {
-		ui.Text(c, locales.ShardProgress()).FontSize(11.5).TextColor(colLabel)
+		ui.Text(c, locales.ShardProgress()).FontSize(11.5).TextColor(a.pal.label)
 		// Drawn rather than built from a box a cell, and tweened as the
 		// frontier moves: the grid costs one element, not ninety-six.
 		ui.Box(c).Height(inspectorHeatHeight).FillWidth().Draw(func(p *ui.Painter, r ui.Rect) {
-			drawHeat(p, r, &a.insHeat, t.ID, cells, paused, chunkGap)
+			drawHeat(p, r, a.pal, &a.insHeat, t.ID, cells, paused, chunkGap)
 		})
 	})
 }
@@ -512,8 +498,8 @@ func (a *App) inspectorShards(c *ui.Context, t download.Task) {
 func (a *App) inspectorMeta(c *ui.Context, t download.Task) {
 	row := func(label, value string) {
 		ui.Row(c).Gap(10).Children(func() {
-			ui.Text(c, label).FontSize(11.5).TextColor(colLabel).Width(48).SingleLine()
-			ui.Text(c, value).FontSize(12.5).TextColor(colMuted).Grow(1).SingleLine().Ellipsis("…").Selectable()
+			ui.Text(c, label).FontSize(11.5).TextColor(a.pal.label).Width(48).SingleLine()
+			ui.Text(c, value).FontSize(12.5).TextColor(a.pal.muted).Grow(1).SingleLine().Ellipsis("…").Selectable()
 		})
 	}
 	ui.Column(c).Gap(8).Children(func() {
@@ -526,23 +512,23 @@ func (a *App) inspectorMeta(c *ui.Context, t download.Task) {
 
 func (a *App) inspectorEvents(c *ui.Context, t download.Task) {
 	ui.Column(c).Gap(7).Children(func() {
-		ui.Text(c, locales.Events()).FontSize(11.5).TextColor(colLabel)
+		ui.Text(c, locales.Events()).FontSize(11.5).TextColor(a.pal.label)
 		event := func(when, text string, color ui.Color) {
 			ui.Row(c).Gap(8).Children(func() {
-				ui.Text(c, when).FontSize(11).TextColor(colFaint).Width(46)
+				ui.Text(c, when).FontSize(11).TextColor(a.pal.faint).Width(46)
 				ui.Text(c, text).FontSize(11.5).TextColor(color).SingleLine().Ellipsis("…").Grow(1)
 			})
 		}
-		event(t.CreatedAt.Format("15:04"), locales.Queued(), colMuted)
+		event(t.CreatedAt.Format("15:04"), locales.Queued(), a.pal.muted)
 		if !t.StartedAt.IsZero() {
-			event(t.StartedAt.Format("15:04"), statusLabel(t), statusColor(t))
+			event(t.StartedAt.Format("15:04"), statusLabel(t), statusColor(a.pal, t))
 		}
 		if t.Status == download.StatusDownloading || t.Status == download.StatusPaused || t.Status == download.StatusQueued {
 			now := fmt.Sprintf("%d %s · %s/s", t.Connections, locales.ConnectionCount(), formatBytes(t.Speed))
 			if t.Status == download.StatusQueued {
 				now = locales.Queued()
 			}
-			event("now", now, colMuted)
+			event("now", now, a.pal.muted)
 		}
 	})
 }

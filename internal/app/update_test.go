@@ -96,7 +96,7 @@ func TestUpdateStatus(t *testing.T) {
 		{name: "current", snapshot: updateSnapshot{Result: &upToDate}, want: locales.UpToDate()},
 	}
 	for _, c := range cases {
-		if got, _ := updateStatus(c.snapshot); got != c.want {
+		if got, _ := updateStatus(lightPal, c.snapshot); got != c.want {
 			t.Errorf("%s: status = %q, want %q", c.name, got, c.want)
 		}
 	}
