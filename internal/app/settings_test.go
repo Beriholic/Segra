@@ -115,6 +115,44 @@ func TestAppearanceFollowsTheDesktop(t *testing.T) {
 	}
 }
 
+// A window with room shows the settings in two columns; a narrow one keeps
+// them in a single column rather than squeezing the controls.
+func TestSettingsUseTwoColumnsWhenTheWindowHasRoom(t *testing.T) {
+	a := newTestApp(t)
+	a.view = "settings"
+
+	wide := ui.NewTester(a.viewFn, 1180, 1400)
+	wide.Frame()
+	folder, ok := wide.Find(locales.DownloadFolder())
+	if !ok {
+		t.Fatalf("texts %q do not show the download folder", wide.Texts())
+	}
+	language, ok := wide.Find(locales.Language())
+	if !ok {
+		t.Fatalf("texts %q do not show the language", wide.Texts())
+	}
+	if language.X <= folder.X {
+		t.Fatalf("language sits at x = %v, not in a column beside the folder at %v", language.X, folder.X)
+	}
+
+	narrow := ui.NewTester(a.viewFn, 980, 1400)
+	narrow.Frame()
+	folder, ok = narrow.Find(locales.DownloadFolder())
+	if !ok {
+		t.Fatalf("texts %q do not show the download folder", narrow.Texts())
+	}
+	language, ok = narrow.Find(locales.Language())
+	if !ok {
+		t.Fatalf("texts %q do not show the language", narrow.Texts())
+	}
+	if language.X < folder.X-1 || language.X > folder.X+1 {
+		t.Fatalf("language sits at x = %v, not in the folder's column at %v", language.X, folder.X)
+	}
+	if language.Y <= folder.Y {
+		t.Fatalf("language sits at y = %v, not below the folder at %v", language.Y, folder.Y)
+	}
+}
+
 // The settings offer the three appearances, and the picker chooses one.
 func TestSettingsChooseAnAppearance(t *testing.T) {
 	a := newTestApp(t)
