@@ -2,7 +2,7 @@
   "name": "Segra",
   "slug": "segra",
   "identifier": "com.beriholic.segra",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "out": "build",
   "icon": "resources/icon.png",
   "urlSchemes": ["segra"],
