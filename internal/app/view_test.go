@@ -32,7 +32,12 @@ func newTestApp(t *testing.T) *App {
 		Connections:   2,
 		MaxConcurrent: 2,
 	}, func() {})
-	t.Cleanup(func() { a.mgr.Close() })
+	// The workers go first, then the saves they asked for: a write still in
+	// flight when the temp dir goes fails its rename and fails the test.
+	t.Cleanup(func() {
+		a.mgr.Close()
+		a.waitSaves()
+	})
 
 	a.list = ui.ListState{
 		Key: func(i int) any {

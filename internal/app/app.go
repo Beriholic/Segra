@@ -81,6 +81,10 @@ type App struct {
 	// finishedAt is when each download landed, for the moment its row shows
 	// it. The manager's events write it off the main thread.
 	finishedAt map[string]time.Time
+	// saves counts the writes persistAsync leaves running, so that whoever
+	// needs them on disk before the app's files go (a test's temp dir, a
+	// shutdown) waits for them instead of racing them.
+	saves sync.WaitGroup
 
 	// newRun counts the times the New Download sheet opened, so that its
 	// entrance plays again rather than only once.
@@ -329,7 +333,9 @@ func (a *App) persistAsync() {
 	}
 	tasks := a.mgr.List()
 	s := a.settings
+	a.saves.Add(1)
 	go func() {
+		defer a.saves.Done()
 		if err := a.store.SaveTasks(tasks); err != nil {
 			log.Printf("save tasks: %v", err)
 		}
@@ -338,6 +344,11 @@ func (a *App) persistAsync() {
 		}
 	}()
 }
+
+// waitSaves blocks until the writes persistAsync started have finished, so
+// that a caller that is about to take the store's directory away sees a
+// settled disk rather than a rename still in flight.
+func (a *App) waitSaves() { a.saves.Wait() }
 
 func (a *App) refresh() {
 	a.tasks = a.mgr.List()
