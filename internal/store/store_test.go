@@ -108,3 +108,42 @@ func TestUnknownAppearanceFallsBackToTheSystem(t *testing.T) {
 		t.Fatalf("theme = %q, want the system's", got.Theme)
 	}
 }
+
+// A settings file from before the history kept itself still gets a tidy
+// list: the defaults fill the fields it does not name.
+func TestHistoryDefaultsOnForAnOlderSettingsFile(t *testing.T) {
+	dir := t.TempDir()
+	old := `{"downloadDir":"/tmp","connections":4,"maxConcurrent":3,"apiPort":47823}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := Open(dir)
+	got, err := s.LoadSettings(DefaultSettings("/tmp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.HistoryAutoClean {
+		t.Fatal("the history is kept whole for a settings file without the field")
+	}
+	if got.HistoryDays != 30 || got.HistoryLimit != 200 {
+		t.Fatalf("history = %d days, %d records, want 30 and 200", got.HistoryDays, got.HistoryLimit)
+	}
+}
+
+// Zero is a choice the user made, not a field the file forgot: a file that
+// says 0 keeps every record.
+func TestHistoryLimitsKeepTheirZero(t *testing.T) {
+	dir := t.TempDir()
+	old := `{"downloadDir":"/tmp","historyDays":0,"historyLimit":0}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := Open(dir)
+	got, err := s.LoadSettings(DefaultSettings("/tmp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.HistoryDays != 0 || got.HistoryLimit != 0 {
+		t.Fatalf("history = %d days, %d records, want no limits", got.HistoryDays, got.HistoryLimit)
+	}
+}

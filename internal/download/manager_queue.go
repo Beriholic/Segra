@@ -3,6 +3,7 @@ package download
 import (
 	"context"
 	"os"
+	"slices"
 	"time"
 )
 
@@ -196,19 +197,24 @@ func (m *Manager) Remove(id string, deleteFiles bool) {
 	m.changed()
 }
 
-// ClearCompleted removes completed tasks, optionally deleting their files.
-func (m *Manager) ClearCompleted(deleteFiles bool) {
+// ClearStatus removes the tasks in one of the given statuses, optionally
+// deleting their files, and reports how many records went. Removing a record
+// is not deleting the file unless deleteFiles says so, which is why the
+// history's tidying keeps to the records.
+func (m *Manager) ClearStatus(deleteFiles bool, statuses ...Status) int {
 	m.mu.Lock()
 	var ids []string
-	for id, t := range m.tasks {
-		if t.Status == StatusCompleted {
+	for _, id := range m.order {
+		if t := m.tasks[id]; t != nil && slices.Contains(statuses, t.Status) {
 			ids = append(ids, id)
 		}
 	}
 	m.mu.Unlock()
+
 	for _, id := range ids {
 		m.Remove(id, deleteFiles)
 	}
+	return len(ids)
 }
 
 func (m *Manager) removeFromQueue(id string) {

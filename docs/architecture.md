@@ -14,7 +14,7 @@ Segra 是单一 Go 二进制：根目录只留一个 `main.go` 负责启动，�
 │   │   ├── run.go            Run：单实例、窗口、托盘、菜单、生命周期
 │   │   ├── app.go            App 状态：刷新、事件、通知、持久化
 │   │   ├── api.go            本地 API（扩展端口）启停、令牌、深链
-│   │   ├── actions.go        界面动作：新建/暂停/继续/移除/打开位置、设置保存
+│   │   ├── actions.go        界面动作：新建/暂停/继续/移除/清理历史/打开位置、设置保存
 │   │   ├── theme.go          亮/暗两套调色板、外观判定与 mygo 主题（颜色、圆角、滚动条）
 │   │   ├── motion.go         动效令牌：时长、弹簧、入场位移
 │   │   ├── heat.go           分片热力图的自绘与逐格插值
@@ -34,6 +34,7 @@ Segra 是单一 Go 二进制：根目录只留一个 `main.go` 负责启动，�
 │   ├── download/             下载引擎，不依赖 UI
 │   │   ├── manager.go            状态、事件、查询
 │   │   ├── manager_queue.go      入队、暂停、继续、移除、清理
+│   │   ├── history.go            历史保留：按天数与条数清理已结束的记录
 │   │   ├── manager_run.go        调度循环与任务生命周期
 │   │   ├── manager_transfer.go   探测、分片传输、续传元数据
 │   │   ├── fetch.go              HTTP Range 探测与单流回退
@@ -72,6 +73,8 @@ main.go ──▶ internal/app ──┬─▶ internal/download
 
 - 一个文件一件事，超过 ~300 行就该考虑拆；`view.go` 只留窗口骨架。
 - 视图函数只做布局；改变状态的逻辑放 `actions.go`。
+- 清理历史只删记录，不删文件：`PruneHistory` / `ClearStatus` 都不碰磁盘上的下载，
+  一条用户看不见的记录仍然是他下载夹里的一个文件。
 - 所有面向用户的文案进 `locales/*.json`，改完跑 `go tool mygo generate`。
 - 新图标放 `internal/app/icons/`，在 `icons.go` 里注册，不内联 SVG。
 - 测试与被测代码同包；引擎行为在 `internal/download/engine_test.go` 覆盖。

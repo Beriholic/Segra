@@ -51,6 +51,7 @@ func (a *App) settingsColumns(c *ui.Context) {
 		ui.Column(c).Grow(1).Gap(16).Children(func() {
 			a.settingsFolderCard(c)
 			a.settingsDownloadsCard(c)
+			a.settingsHistoryCard(c)
 			a.settingsPortCard(c)
 			a.settingsExtensionCard(c)
 		})
@@ -69,6 +70,7 @@ func (a *App) settingsStack(c *ui.Context) {
 	ui.Column(c).FillWidth().Gap(16).Children(func() {
 		a.settingsFolderCard(c)
 		a.settingsDownloadsCard(c)
+		a.settingsHistoryCard(c)
 		a.settingsPortCard(c)
 		a.settingsExtensionCard(c)
 		a.settingsAppearanceCard(c)
@@ -123,6 +125,39 @@ func (a *App) settingsDownloadsCard(c *ui.Context) {
 				ui.Text(c, locales.MaxConcurrentHint()).FontSize(11).TextColor(a.pal.faint)
 			})
 		})
+	})
+}
+
+func (a *App) settingsHistoryCard(c *ui.Context) {
+	a.settingsCard(c, locales.History(), func() {
+		a.switchRow(c, locales.AutoCleanHistory(), locales.AutoCleanHistoryHint(), &a.settings.HistoryAutoClean)
+		// The two limits are the same kind of control, so they sit side by
+		// side and read as one sentence: keep this long, keep this many.
+		body := ui.Column(c).Gap(14).Children(func() {
+			ui.Row(c).Gap(24).Children(func() {
+				ui.Column(c).Gap(6).Grow(1).Children(func() {
+					ui.Text(c, locales.KeepFor()).FontSize(12).TextColor(a.pal.muted)
+					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+						if ui.NumberInput(c, &a.historyDaysField, 0, 3650, 1).Changed() {
+							a.applySettings()
+						}
+						ui.Text(c, locales.Days()).FontSize(11.5).TextColor(a.pal.faint)
+					})
+					ui.Text(c, locales.KeepForHint()).FontSize(11).TextColor(a.pal.faint)
+				})
+				ui.Column(c).Gap(6).Grow(1).Children(func() {
+					ui.Text(c, locales.KeepAtMost()).FontSize(12).TextColor(a.pal.muted)
+					if ui.NumberInput(c, &a.historyLimitField, 0, 100000, 10).Changed() {
+						a.applySettings()
+					}
+					ui.Text(c, locales.KeepAtMostHint()).FontSize(11).TextColor(a.pal.faint)
+				})
+			})
+		})
+		if !a.settings.HistoryAutoClean {
+			// The limits say nothing while nothing cleans up by them.
+			body.Opacity(0.45)
+		}
 	})
 }
 

@@ -211,8 +211,50 @@ func (a *App) mainHeader(c *ui.Context) {
 		if active == 0 {
 			pause.Opacity(0.5)
 		}
+		a.historyMenu(c)
 		a.primaryButton(c, locales.NewDownload(), a.openNew).Height(34).Radius(17)
 	})
+}
+
+// historyMenu is the header's way to tidy the list by hand: the finished
+// records go and the files stay, as the automatic clean-up leaves them. It
+// greys out when nothing is finished, and each item says how many records it
+// would take, so a clear that does nothing is not offered at all.
+func (a *App) historyMenu(c *ui.Context) {
+	completed := a.countStatus(download.StatusCompleted)
+	failed := a.countStatus(download.StatusFailed)
+	empty := completed+failed == 0
+
+	btn := ui.Box(c).Size(34, 34).Radius(17).AlignItems(ui.Center).Justify(ui.Center).
+		Background(a.pal.card).Border(1, a.pal.line)
+	if btn.Hovered() && !empty {
+		btn = btn.Background(a.pal.cardHover).Border(1, a.pal.edge)
+	}
+	btn.Transition(hoverColors)
+	btn.AnimatePose(pressPose(btn), springSnap)
+	btn.Disabled(empty)
+	if empty {
+		btn.Opacity(0.5)
+	}
+	btn.Tooltip(locales.ClearHistory())
+	// An icon-only button needs its name for assistive technology, and it
+	// is how a test finds it.
+	btn.Label(locales.ClearHistory())
+	btn.Menu(func(m *ui.Menu) {
+		a.historyItem(m, download.StatusCompleted, locales.ClearCompleted(), completed)
+		a.historyItem(m, download.StatusFailed, locales.ClearFailed(), failed)
+	})
+	btn.Children(func() {
+		ui.Icon(c, icTrash).FontSize(15).TextColor(a.pal.muted)
+	})
+}
+
+// historyItem is one clear of the history menu. The count says what it would
+// take, so a record group that is already empty is not offered.
+func (a *App) historyItem(m *ui.Menu, status download.Status, label string, count int) {
+	if m.Item(fmt.Sprintf("%s (%d)", label, count)).Disabled(count == 0).Chosen() {
+		a.clearHistory(status)
+	}
 }
 
 func (a *App) emptyState(c *ui.Context) {

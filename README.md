@@ -22,6 +22,9 @@ video to the desktop app from the context menu.
   size, `ETag` and `Last-Modified` on the way back in. Pausing, quitting and restarting lose
   nothing.
 - **Queue and concurrency** — 1–8 downloads at a time, pause all / resume all, retry failures.
+- **History that tidies itself** — finished records leave the list once they are older than the days
+  or beyond the records the settings allow, and the trash button in the list header clears them by
+  hand. Only the records go: the files you downloaded stay where they are.
 - **Native UI** — drawn by mygo's `ui` package, light or dark, following the system or chosen
   in the settings, in English and Simplified Chinese, following the system or chosen by hand.
 - **Browser extension** — takes over the browser's downloads: the browser's copy is cancelled and

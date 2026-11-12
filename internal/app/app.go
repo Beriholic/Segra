@@ -114,6 +114,10 @@ type App struct {
 	connsField      float64
 	concurrentField float64
 	portField       float64
+	// historyDaysField and historyLimitField are the history's two limits as
+	// the settings show them, folded into the settings when they change.
+	historyDaysField  float64
+	historyLimitField float64
 	// fieldDirty holds a folder typed into the settings that has not become
 	// a setting yet: it saves once the field is left, not on every letter.
 	fieldDirty bool
@@ -198,6 +202,9 @@ func (a *App) start() {
 		}
 		a.mgr.Load(tasks)
 	}
+	// A list read from disk may hold more history than the settings keep;
+	// the oldest records go before the window shows them.
+	a.pruneHistory()
 	if a.settings.AutoResume {
 		// Only what the user left running: a task they paused on purpose
 		// waits for them to resume it.
@@ -543,7 +550,12 @@ func (a *App) onDownloadEvent(e download.Event) {
 		a.notify(locales.NotifCompleted(), e.Task.FileName, e.Task.ID)
 	case download.EventFailed:
 		a.notify(locales.NotifFailed(), e.Task.FileName, e.Task.ID)
+	default:
+		return
 	}
+	// A download that has just ended may push the list past what the history
+	// keeps, so the oldest record goes as soon as the newest lands.
+	a.pruneHistory()
 }
 
 func (a *App) notify(title, body, id string) {

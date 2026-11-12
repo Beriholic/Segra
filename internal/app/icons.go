@@ -44,6 +44,7 @@ var (
 	icActive   = mustIcon("arrow-down")
 	icChevronL = mustIcon("chevron-left")
 	icChevronR = mustIcon("chevron-right")
+	icTrash    = mustIcon("trash-2")
 )
 
 func iconForName(name string) *ui.SVG {

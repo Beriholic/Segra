@@ -324,6 +324,36 @@ func (msgs Messages) ClearCompleted() string {
 	return Catalog.Format(msgs.locale, "clearCompleted", nil)
 }
 
+// ClearHistory says "Clear history"
+// in the language the app shows.
+func ClearHistory() string { return In(i18n.Locale()).ClearHistory() }
+
+// ClearHistory says "Clear history"
+// in the language of msgs.
+func (msgs Messages) ClearHistory() string {
+	return Catalog.Format(msgs.locale, "clearHistory", nil)
+}
+
+// ClearFailed says "Clear Failed"
+// in the language the app shows.
+func ClearFailed() string { return In(i18n.Locale()).ClearFailed() }
+
+// ClearFailed says "Clear Failed"
+// in the language of msgs.
+func (msgs Messages) ClearFailed() string {
+	return Catalog.Format(msgs.locale, "clearFailed", nil)
+}
+
+// HistoryCleared says "History cleared"
+// in the language the app shows.
+func HistoryCleared() string { return In(i18n.Locale()).HistoryCleared() }
+
+// HistoryCleared says "History cleared"
+// in the language of msgs.
+func (msgs Messages) HistoryCleared() string {
+	return Catalog.Format(msgs.locale, "historyCleared", nil)
+}
+
 // OpenFolder says "Open Downloads Folder"
 // in the language the app shows.
 func OpenFolder() string { return In(i18n.Locale()).OpenFolder() }
@@ -482,6 +512,86 @@ func MaxConcurrentHint() string { return In(i18n.Locale()).MaxConcurrentHint() }
 // in the language of msgs.
 func (msgs Messages) MaxConcurrentHint() string {
 	return Catalog.Format(msgs.locale, "maxConcurrentHint", nil)
+}
+
+// History says "History"
+// in the language the app shows.
+func History() string { return In(i18n.Locale()).History() }
+
+// History says "History"
+// in the language of msgs.
+func (msgs Messages) History() string {
+	return Catalog.Format(msgs.locale, "history", nil)
+}
+
+// AutoCleanHistory says "Clean up history automatically"
+// in the language the app shows.
+func AutoCleanHistory() string { return In(i18n.Locale()).AutoCleanHistory() }
+
+// AutoCleanHistory says "Clean up history automatically"
+// in the language of msgs.
+func (msgs Messages) AutoCleanHistory() string {
+	return Catalog.Format(msgs.locale, "autoCleanHistory", nil)
+}
+
+// AutoCleanHistoryHint says "Finished downloads leave the list once they are older than the limits below. The files stay where they were downloaded."
+// in the language the app shows.
+func AutoCleanHistoryHint() string { return In(i18n.Locale()).AutoCleanHistoryHint() }
+
+// AutoCleanHistoryHint says "Finished downloads leave the list once they are older than the limits below. The files stay where they were downloaded."
+// in the language of msgs.
+func (msgs Messages) AutoCleanHistoryHint() string {
+	return Catalog.Format(msgs.locale, "autoCleanHistoryHint", nil)
+}
+
+// KeepFor says "Keep for"
+// in the language the app shows.
+func KeepFor() string { return In(i18n.Locale()).KeepFor() }
+
+// KeepFor says "Keep for"
+// in the language of msgs.
+func (msgs Messages) KeepFor() string {
+	return Catalog.Format(msgs.locale, "keepFor", nil)
+}
+
+// Days says "days"
+// in the language the app shows.
+func Days() string { return In(i18n.Locale()).Days() }
+
+// Days says "days"
+// in the language of msgs.
+func (msgs Messages) Days() string {
+	return Catalog.Format(msgs.locale, "days", nil)
+}
+
+// KeepForHint says "0 keeps every record."
+// in the language the app shows.
+func KeepForHint() string { return In(i18n.Locale()).KeepForHint() }
+
+// KeepForHint says "0 keeps every record."
+// in the language of msgs.
+func (msgs Messages) KeepForHint() string {
+	return Catalog.Format(msgs.locale, "keepForHint", nil)
+}
+
+// KeepAtMost says "Keep at most"
+// in the language the app shows.
+func KeepAtMost() string { return In(i18n.Locale()).KeepAtMost() }
+
+// KeepAtMost says "Keep at most"
+// in the language of msgs.
+func (msgs Messages) KeepAtMost() string {
+	return Catalog.Format(msgs.locale, "keepAtMost", nil)
+}
+
+// KeepAtMostHint says "0 keeps them all."
+// in the language the app shows.
+func KeepAtMostHint() string { return In(i18n.Locale()).KeepAtMostHint() }
+
+// KeepAtMostHint says "0 keeps them all."
+// in the language of msgs.
+func (msgs Messages) KeepAtMostHint() string {
+	return Catalog.Format(msgs.locale, "keepAtMostHint", nil)
 }
 
 // PortLabel says "Extension port"

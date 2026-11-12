@@ -72,6 +72,20 @@ type SegmentProgress struct {
 // Path is the final path of the task's file.
 func (t Task) Path() string { return filepath.Join(t.Dir, t.FileName) }
 
+// FinishedAt is when the download ended, which is what the history ages a
+// finished record by: the moment it landed, or, for a task that failed, when
+// it last started, or when it was created if it never did.
+func (t Task) FinishedAt() time.Time {
+	switch {
+	case !t.CompletedAt.IsZero():
+		return t.CompletedAt
+	case !t.StartedAt.IsZero():
+		return t.StartedAt
+	default:
+		return t.CreatedAt
+	}
+}
+
 // Percent is the completed fraction in [0, 1], or 0 when the size is not
 // known yet.
 func (t Task) Percent() float64 {
@@ -106,6 +120,11 @@ func (s Status) Active() bool {
 
 // Complete reports whether the task is done.
 func (s Status) Complete() bool { return s == StatusCompleted }
+
+// Finished reports whether the task is over: it either landed or failed.
+// These are the records the history holds, and the only ones it may drop; a
+// paused task is work not yet done.
+func (s Status) Finished() bool { return s == StatusCompleted || s == StatusFailed }
 
 // CreateRequest is what a caller asks the manager to download.
 type CreateRequest struct {

@@ -45,6 +45,16 @@ type Settings struct {
 	// seconds, so that a relaunch within a day does not ask again.
 	CheckUpdates    bool  `json:"checkUpdates"`
 	UpdateCheckedAt int64 `json:"updateCheckedAt,omitempty"`
+
+	// History keeps the list from growing without end. HistoryAutoClean drops
+	// finished records as the app runs: those that ended more than
+	// HistoryDays ago, and all but the HistoryLimit newest of them, 0 in
+	// either meaning no limit there. Only records go; the files a download
+	// wrote are never touched, and a download still on its way is not
+	// history.
+	HistoryAutoClean bool `json:"historyAutoClean"`
+	HistoryDays      int  `json:"historyDays"`
+	HistoryLimit     int  `json:"historyLimit"`
 }
 
 // DefaultSettings returns settings for a first run.
@@ -64,6 +74,11 @@ func DefaultSettings(downloadDir string) Settings {
 		CloseToTray:   false,
 		HideDock:      false,
 		CheckUpdates:  true,
+		// A month and a couple of hundred rows: enough to find last week's
+		// download, few enough that the list stays a list.
+		HistoryAutoClean: true,
+		HistoryDays:      30,
+		HistoryLimit:     200,
 	}
 }
 
@@ -86,6 +101,18 @@ func (s *Settings) Normalize() {
 	}
 	if s.DownloadDir == "" {
 		s.DownloadDir = "."
+	}
+	if s.HistoryDays < 0 {
+		s.HistoryDays = 0
+	}
+	if s.HistoryDays > 3650 {
+		s.HistoryDays = 3650
+	}
+	if s.HistoryLimit < 0 {
+		s.HistoryLimit = 0
+	}
+	if s.HistoryLimit > 100000 {
+		s.HistoryLimit = 100000
 	}
 	switch s.Theme {
 	case ThemeLight, ThemeDark:

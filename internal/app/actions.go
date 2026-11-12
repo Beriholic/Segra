@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo"
 
@@ -123,6 +124,36 @@ func (a *App) remove(t download.Task, deleteFiles bool) {
 	a.persistAsync()
 }
 
+// clearHistory drops the finished downloads in the given statuses from the
+// list, which is the tidy-up the user asks for by hand. The records go and
+// the files stay, exactly as the automatic clean-up leaves them.
+func (a *App) clearHistory(statuses ...download.Status) {
+	if a.mgr == nil {
+		return
+	}
+	n := a.mgr.ClearStatus(false, statuses...)
+	if n == 0 {
+		return
+	}
+	a.persistAsync()
+	a.say(locales.HistoryCleared())
+}
+
+// pruneHistory drops the finished records the history settings no longer
+// keep: those past their days, and all but the newest the limit allows. Only
+// the records go; the files stay where they were downloaded.
+func (a *App) pruneHistory() int {
+	if a.mgr == nil || !a.settings.HistoryAutoClean {
+		return 0
+	}
+	keep := time.Duration(a.settings.HistoryDays) * 24 * time.Hour
+	n := a.mgr.PruneHistory(keep, a.settings.HistoryLimit)
+	if n > 0 {
+		a.persistAsync()
+	}
+	return n
+}
+
 func (a *App) reveal(t download.Task) {
 	path := t.Path()
 	if _, err := os.Stat(path); err == nil {
@@ -195,6 +226,10 @@ func (a *App) applySettings() {
 			MaxConcurrent: s.MaxConcurrent,
 		})
 	}
+	// The history settings just changed, so what they keep goes now rather
+	// than at the next download: lowering a limit is meant to tidy the list
+	// as it is typed.
+	a.pruneHistory()
 	// The switch writes a.settings as it is flipped, so there is no old
 	// value left to compare with: what the system was told last is the
 	// only thing that says whether it needs telling again.
@@ -251,6 +286,8 @@ func (a *App) captureSettings() store.Settings {
 	s.Connections = int(a.connsField)
 	s.MaxConcurrent = int(a.concurrentField)
 	s.APIPort = int(a.portField)
+	s.HistoryDays = int(a.historyDaysField)
+	s.HistoryLimit = int(a.historyLimitField)
 	s.Normalize()
 	return s
 }
@@ -260,6 +297,8 @@ func (a *App) syncFields() {
 	a.connsField = float64(a.settings.Connections)
 	a.concurrentField = float64(a.settings.MaxConcurrent)
 	a.portField = float64(a.settings.APIPort)
+	a.historyDaysField = float64(a.settings.HistoryDays)
+	a.historyLimitField = float64(a.settings.HistoryLimit)
 	a.langTag = a.settings.Language
 	a.themePick = themeIndex(a.settings.Theme)
 }
